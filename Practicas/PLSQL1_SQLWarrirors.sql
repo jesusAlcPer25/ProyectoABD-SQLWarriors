@@ -25,7 +25,9 @@ END;
 ---------------- Para crear el paquete ------------------------------
 CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
 
-    EXCEPTION EXCEPTION_PLAN_NO_ASIGNADO;   -- To do
+    EXCEPTION EXCEPTION_PLAN_NO_ASIGNADO;
+    EXCEPTION INVALID_DATA;
+    EXCEPTION EXCEPTION_ASOCIACION_DUPLICADA;
     
     FUNCTION F_OBTENER_PLAN_CUENTA(P_CUENTA_ID IN CUENTA.ID%TYPE) 
         RETURN PLAN%ROWTYPE;
@@ -210,35 +212,133 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
 -----------------------------------------------------------------------------------------------------------
 
+    FUNCTION F_NUM_CATEGORIAS_CUENTA( p_cuenta_id IN CUENTA.ID%TYPE ) 
+        RETURN NUMBER 
+    IS
+        V_TOTAL             NUMBER;
+        V_CUENTA            CUENTA%ROWTYPE;
+        V_MENSAJE           VARCHAR2(500);
+    BEGIN
+        
+        SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
+        
+        IF V_CUENTA IS NULL THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
 
+        SELECT COUNT(*) INTO V_TOTAL
+            FROM CATEGORIA
+            WHERE CUENTA_ID = p_cuenta_id;
 
+        RETURN V_TOTAL;
 
+    EXCEPTION
+        WHEN OTHERS THEN
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE;                                          -- Para propagar yo el error
 
-
-
-
+    END F_NUM_CATEGORIAS_CUENTA;
 
 -----------------------------------------------------------------------------------------------------------
 
+    PROCEDURE P_ACTUALIZAR_NOMBRE_PRODUCTO(
+        P_PRODUCTO_GTIN IN PRODUCTO.GTIN%TYPE,
+        p_cuenta_id     IN PRODUCTO.CUENTA_ID%TYPE,
+        p_nuevo_nombre  IN PRODUCTO.NOMBRE%TYPE
+    ) 
+    IS
+        V_AUX           PRODUCTO.GTIN%TYPE;
+        V_MENSAJE       VARCHAR2(500);
+    BEGIN
 
+        SELECT GTIN INTO V_AUX
+            FROM PRODUCTO
+            WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = P_CUENTA_ID;
 
+        IF V_AUX IS NULL THEN 
+            RAISE NO_DATA_FOUND;
+        END IF;
+    
+        IF p_nuevo_nombre IS NULL OR TRIM(p_nuevo_nombre) = '' THEN
+        RAISE INVALID_DATA;
+        END IF;
 
+        UPDATE PRODUCTO
+            SET NOMBRE = p_nuevo_nombre
+            WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = p_cuenta_id;
 
+    EXCEPTION
+        WHEN OTHERS THEN
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE;                                          -- Para propagar yo el error
 
-
-
-
+    END P_ACTUALIZAR_NOMBRE_PRODUCTO;
 
 -----------------------------------------------------------------------------------------------------------
 
+    PROCEDURE P_ASOCIAR_ACTIVO_A_PRODUCTO(
+        p_producto_gtin        IN PRODUCTO.GTIN%TYPE,
+        p_producto_cuenta_id   IN PRODUCTO.CUENTA_ID%TYPE,
+        p_activo_id            IN ACTIVOS.ID%TYPE,
+        p_activo_cuenta_id     IN ACTIVOS.CUENTA_ID%TYPE
+    ) IS
+        V_AUX           PRODUCTO.GTIN%TYPE;
+        V_GTIN          PRODUCTO.GTIN%TYPE;
+        V_ACTIVO        ACTIVO.ID%TYPE;
+        v_mensaje       VARCHAR2(500);
+    BEGIN
 
+        SELECT GTIN, CUENTA_ID INTO V_GTIN
+            FROM PRODUCTO
+            WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = p_producto_cuenta_id;
 
+        SELECT ID INTO V_ACTIVO
+            FROM ACTIVO
+            WHERE P_ACTIVO_ID = P_ACTIVO_CUENTA_ID;
 
+        IF V_GTIN IS NULL OR V_ACTIVO IS NULL THEN 
+            RAISE NO_DATA_FOUND;
+        END IF;
+-------------------------------------- PREGUNTAR PROFE
+        BEGIN
+            SELECT PRODUCTO_GTIN, ACTIVO_ID INTO V_AUX
+                FROM PROD_ACT
+                WHERE PRODUCTO_GTIN = p_producto_gtin AND ACTIVO_ID = p_activo_id;
+            
+            RAISE EXCEPTION_ASOCIACION_DUPLICADA;
 
+        EXCEPTION
+            WHEN EXCEPTION_ASOCIACION_DUPLICADA THEN 
+                RAISE;
+        END;
+------------------------------------
+        INSERT INTO PROD_ACT (PRODUCTO_GTIN, ACTIVO_ID)
+            VALUES (p_producto_gtin, p_activo_id);
 
+    EXCEPTION
+        WHEN OTHERS THEN
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE;                                          -- Para propagar yo el error
 
-
-
+    END P_ASOCIAR_ACTIVO_A_PRODUCTO;
 
 -----------------------------------------------------------------------------------------------------------
 
