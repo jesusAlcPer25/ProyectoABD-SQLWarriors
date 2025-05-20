@@ -28,6 +28,7 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
     EXCEPTION EXCEPTION_PLAN_NO_ASIGNADO;
     EXCEPTION INVALID_DATA;
     EXCEPTION EXCEPTION_ASOCIACION_DUPLICADA;
+    EXCEPTION EXCEPTION_USUARIO_EXISTE;
     
     FUNCTION F_OBTENER_PLAN_CUENTA(P_CUENTA_ID IN CUENTA.ID%TYPE) 
         RETURN PLAN%ROWTYPE;
@@ -342,34 +343,156 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
 -----------------------------------------------------------------------------------------------------------
 
+    PROCEDURE P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES(
+        p_producto_gtin     IN PRODUCTO.GTIN%TYPE,
+        p_cuenta_id         IN PRODUCTO.CUENTA_ID%TYPE
+    ) IS
+        V_AUX               PRODUCTO.GTIN%TYPE;
+        v_mensaje           VARCHAR2(500);
+    BEGIN
+        SELECT GTIN INTO V_AUX
+        FROM PRODUCTO
+        WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
+        IF V_AUX IS NULL THEN 
+            RAISE NO_DATA_FOUND;
+        END IF;
 
+        DELETE FROM ACT_PRO
+        WHERE PRODUCTO_GTIN = p_producto_gtin;
 
+        DELETE FROM ATRIBUTO_PRODUCTO
+        WHERE PRODUCTO_GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
+        DELETE FROM PROD_CAT
+        WHERE PRODUCTO_GTIN = p_producto_gtin;
 
+        DELETE FROM RELACIONADO
+        WHERE PRODUCTO1 = p_producto_gtin OR PRODUCTO2 = p_producto_gtin;
 
+        DELETE FROM PRODUCTO
+        WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
+    EXCEPTION
+        WHEN OTHERS THEN
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE;
+
+    END P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES;
 
 -----------------------------------------------------------------------------------------------------------
 
+    PROCEDURE P_ACTUALIZAR_PRODUCTOS( p_cuenta_id IN CUENTA.ID%TYPE )
+    IS
+        CURSOR cur_productos
+        IS
+            SELECT GTIN, CUENTA_ID
+            FROM PRODUCTO_EXT
+            WHERE CUENTA_ID = p_cuenta_id;
 
+        V_AUX               PRODUCTO.GTIN%TYPE;
+        V_AUX_2             PRODUCTO.NOMBRE%TYPE;
+        v_gtin              PRODUCTO.GTIN%TYPE;
+        v_cuenta_id         PRODUCTO.CUENTA_ID%TYPE;
+        V_NOMBRE            PRODUCTO.NOMBRE%TYPE;
+        v_mensaje           VARCHAR2(500);
+    BEGIN
+        FOR prod IN cur_productos LOOP
+            v_gtin := prod.GTIN;
+            v_cuenta_id := prod.CUENTA_ID;
+            V_NOMBRE := prod.NOMBRE;
 
+            BEGIN
+                SELECT GTIN INTO V_AUX
+                    FROM PRODUCTO
+                    WHERE GTIN = v_gtin AND CUENTA_ID = v_cuenta_id;
 
+                SELECT NOMBRE INTO V_AUX_2
+                    FROM PRODUCTO
+                    WHERE GTIN = v_gtin AND CUENTA_ID = v_cuenta_id;
 
+                IF V_AUX IS NULL THEN
+                    INSERT INTO PRODUCTO VALUES(
+                        SELECT * FROM cur_productos
+                    )
+                ELSE IF (NOT V_AUX IS NULL) && (V_NOMBRE != V_AUX_2) THEN
+                    P_ACTUALIZAR_NOMBRE_PRODUCTO(v_gtin, v_cuenta_id, V_NOMBRE)
+                ELSE
+                    P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES(v_gtin, v_cuenta_id);
+                END IF;
+                
+            EXCEPTION
+                WHEN OTHERS THEN
+                    INSERT INTO TRAZA VALUES (
+                        SYSDATE,                                    -- Fecha
+                        USER,                                       -- Usuario
+                        $$PLSQL_UNIT,                               -- Causante
+                        SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                    V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+                    DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+                    RAISE;
+            END;
 
-
+        END LOOP;
+        
+    END P_ACTUALIZAR_PRODUCTOS;
 
 -----------------------------------------------------------------------------------------------------------
 
+    PROCEDURE P_CREAR_USUARIO(
+        p_usuario         IN USUARIO%ROWTYPE,
+        p_rol             IN VARCHAR2(50),
+        p_password        IN VARCHAR2(100)
+    ) IS
+        V_AUX     USUARIO.ID%TYPE;
+        v_mensaje   VARCHAR2(500);
+    BEGIN
+        SELECT ID INTO V_AUX
+            FROM USUARIO
+            WHERE ID = p_id;
 
+        IF NOT V_AUX IS NULL THEN
+            RAISE EXCEPTION_USUARIO_EXISTE;
+        END IF;
 
+        BEGIN
+            SELECT ID INTO V_AUX
+                FROM USUARIO
+                WHERE EMAIL = p_usuario.EMAIL;
 
+            IF NOT V_AUX IS NULL THEN
+                RAISE EXCEPTION_USUARIO_EXISTE;
+            END IF;
+        END;
 
+        IF (p_usuario.ID IS NULL) OR (p_usuario.NOMBRE_USUARIO IS NULL) OR (p_usuario.NOMBRECOMPLETO IS NULL) OR (p_usuario.CUENTA_ID IS NULL) THEN
+            RAISE INVALID_DATA;
+        END IF;
 
+        -- Insertar nuevo usuario
+        INSERT INTO USUARIO(ID, NOMBRE_USUARIO, NOMBRECOMPLETO, AVATAR, EMAIL, TELEFONO, CUENTA_ID)
+        VALUES (p_usuario.ID, p_usuario.NOMBRE_USUARIO, p_usuario.NOMBRECOMPLETO, p_usuario.AVATAR, p_usuario.EMIAL, p_usuario.TELEFONO, p_usuario.CUENTA_ID);
+
+    EXCEPTION
+            WHEN OTHERS THEN
+                INSERT INTO TRAZA VALUES (
+                    SYSDATE,                                    -- Fecha
+                    USER,                                       -- Usuario
+                    $$PLSQL_UNIT,                               -- Causante
+                    SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+                DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+                RAISE;
+
+    END P_CREAR_USUARIO;
 
 -----------------------------------------------------------------------------------------------------------
-
-
 
 END;
 /
