@@ -112,7 +112,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 2
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    F_LISTA_CATEGORIAS_PRODUCTO(
+    FUNCTION F_LISTA_CATEGORIAS_PRODUCTO(
         p_producto_gtin IN PRODUCTO.GTIN%TYPE,
         p_cuenta_id IN PRODUCTO.CUENTA_ID%TYPE
     )
@@ -132,7 +132,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
         V_MENSAJE VARCHAR2(500);
     BEGIN
-        SELECT GTIN CUENTA_ID INTO V_PRODUCTO
+        SELECT GTIN, CUENTA_ID INTO V_PRODUCTO
             FROM PRODUCTO
             WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
         
@@ -164,7 +164,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
-    END F_CONTAR_PRODUCTOS_CUENTA;
+    END F_LISTA_CATEGORIAS_PRODUCTO;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -172,10 +172,127 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 3
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
+    PROCEDURE P_MIGRAR_PRODUCTOS_A_CATEGORIA(
+        p_cuenta_id             IN CUENTA.ID%TYPE,
+        p_categoria_origen_id   IN CATEGORIA.ID%TYPE,
+        p_categoria_destino_id  IN CATEGORIA.ID%TYPE
+    )
+    AS
+        V_CUENTA                CUENTA.ID%TYPE;
+        V_CAT_ORIGEN            CATEGORIA.ID%TYPE;
+        V_CAT_DESTINO           CATEGORIA.ID%TYPE;
+        V_MENSAJE               VARCHAR2(500);
+
+        CURSOR C_PRODUCTOS IS
+            SELECT PC.PRODUCTO_GTIN
+            FROM PROD_CAT PC
+            JOIN CATEGORIA C ON C.ID = PC.CATEGORIA_ID
+            WHERE PC.CATEGORIA_ID = p_categoria_origen_id
+            AND C.CUENTA_ID = p_cuenta_id
+            FOR UPDATE;
+
+    BEGIN
+        SELECT ID INTO V_CUENTA
+            FROM CUENTA
+            WHERE ID = P_CUENTA_ID;
+        
+        SELECT ID INTO V_CAT_ORIGEN
+            FROM CATEGORIA
+            WHERE ID = P_CATEGORIA_ORIGEN_ID AND CUENTA_ID = P_CUENTA_ID;
+
+        SELECT ID INTO V_CAT_DESTINO
+            FROM CATEGORIA
+            WHERE ID = P_CATEGORIA_DESTINO_ID AND CUENTA_ID = P_CUENTA_ID;
+
+        IF (V_CUENTA IS NULL) OR (V_CAT_ORIGEN IS NULL) OR (V_CAT_DESTINO IS NULL) THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
+
+        FOR producto IN c_productos LOOP
+            DELETE FROM PROD_CAT
+            WHERE PRODUCTO_GTIN = producto.PRODUCTO_GTIN AND CATEGORIA_ID = p_categoria_origen_id;
+
+            INSERT INTO PROD_CAT(PRODUCTO_GTIN, CATEGORIA_ID)VALUES (producto.PRODUCTO_GTIN, p_categoria_destino_id);
+        END LOOP;
+
+        COMMIT;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE; 
+    END P_MIGRAR_PRODUCTOS_A_CATEGORIA;
+
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 -- Ejercicio 4
 ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+    PROCEDURE P_REPLICAR_ATRIBUTOS(
+        p_cuenta_id             IN CUENTA.ID%TYPE,
+        p_producto_gtin_origen  IN PRODUCTO.GTIN%TYPE,
+        p_producto_gtin_destino IN PRODUCTO.GTIN%TYPE
+    )
+    AS
+        V_PRODUCTO_ORIGEN       PRODUCTO.GTIN%TYPE;
+        V_PRODUCTO_DESTINO      PRODUCTO.GTIN%TYPE;
+        V_ATRIBUTO_AUX          ATRIBUTO_PRODUCTO.ID%TYPE;
+        V_MENSAJE               VARCHAR2(500);
+
+        CURSOR C_ATRIBUTOS_ORIGEN IS
+            SELECT *
+            FROM ATRIBUTO_PRODUCTO
+            WHERE PRODUCTO_GTIN = p_producto_gtin_origen;
+
+        v_atributo ATRIBUTO_PRODUCTO%ROWTYPE;
+
+    BEGIN
+        -- Verificar existencia de producto origen
+        SELECT GTIN, CUENTA_ID INTO V_PRODUCTO_ORIGEN
+        FROM PRODUCTO
+        WHERE GTIN = p_producto_gtin_origen AND CUENTA_ID = p_cuenta_id;
+
+        SELECT GTIN, CUENTA_ID INTO V_PRODUCTO_DESTINO
+        FROM PRODUCTO
+        WHERE GTIN = p_producto_gtin_destino AND CUENTA_ID = p_cuenta_id;
+
+        IF (V_PRODUCTO_ORIGEN IS NULL) OR (V_PRODUCTO_ORIGEN) THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
+
+        FOR v_atributo IN C_ATRIBUTOS_ORIGEN LOOP
+            SELECT PRODUCTO_GTIN, CODIGO_ATRIBUTO INTO V_ATRIBUTO_AUX
+            FROM ATRIBUTO_PRODUCTO
+            WHERE PRODUCTO_GTIN = p_producto_gtin_destino AND CODIGO_ATRIBUTO = v_atributo.CODIGO_ATRIBUTO;
+
+            IF V_ATRIBUTO_AUX IS NULL THEN
+                INSERT INTO ATRIBUTO_PRODUCTO (PRODUCTO_GTIN, CODIGO_ATRIBUTO, VALOR) VALUES (p_producto_gtin_destino, v_atributo.CODIGO_ATRIBUTO, v_atributo.VALOR);
+            ELSE
+                UPDATE ATRIBUTO_PRODUCTO
+                    SET VALOR = v_atributo.VALOR
+                    WHERE PRODUCTO_GTIN = p_producto_gtin_destino AND CODIGO_ATRIBUTO = v_atributo.CODIGO_ATRIBUTO;
+            END IF;
+        END LOOP;
+
+        COMMIT;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE; 
+    END P_REPLICAR_ATRIBUTOS;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
