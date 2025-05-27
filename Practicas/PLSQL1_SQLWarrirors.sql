@@ -84,8 +84,6 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
         (
             P_CUENTA_ID IN CUENTA.ID%TYPE
         );
-
-
 END;
 /
 
