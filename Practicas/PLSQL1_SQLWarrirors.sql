@@ -451,10 +451,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
                 IF V_AUX IS NULL THEN
                     INSERT INTO PRODUCTO VALUES(
-                        SELECT * FROM cur_productos
-                    )
-                ELSE IF (NOT V_AUX IS NULL) && (V_NOMBRE != V_AUX_2) THEN
-                    P_ACTUALIZAR_NOMBRE_PRODUCTO(v_gtin, v_cuenta_id, V_NOMBRE)
+                        SELECT * FROM cur_productos -- Comprobar si hay que añadir mas parametros a producto
+                    );
+                ELSIF (NOT V_AUX IS NULL) AND (V_NOMBRE != V_AUX_2) THEN
+                    P_ACTUALIZAR_NOMBRE_PRODUCTO(v_gtin, v_cuenta_id, V_NOMBRE);
                 ELSE
                     P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES(v_gtin, v_cuenta_id);
                 END IF;
@@ -483,8 +483,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     PROCEDURE P_CREAR_USUARIO(
         p_usuario         IN USUARIO%ROWTYPE,
-        p_rol             IN VARCHAR2(50),
-        p_password        IN VARCHAR2(100)
+        p_rol             IN VARCHAR2,
+        p_password        IN VARCHAR2
     ) IS
         V_AUX     USUARIO.ID%TYPE;
         v_mensaje   VARCHAR2(500);
