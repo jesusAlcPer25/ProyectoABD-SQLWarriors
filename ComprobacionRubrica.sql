@@ -8,12 +8,6 @@ SET ECHO ON; -- Muestra la operacion ejecutada antes del resultado
 SELECT COUNT(*) FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_PLYTIX' OR TABLESPACE_NAME = 'TS_INDICES';
 SELECT COUNT(*) FROM V$DATAFILE WHERE UPPER(NAME) LIKE '%PLYTIX%' OR UPPER(NAME) LIKE '%INDICES%';
 
-/* SELECT * FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_PLYTIX';
-SELECT * FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_INDICES'; */
-/* SELECT owner, segment_name, segment_type, tablespace_name
-FROM dba_segments
-WHERE tablespace_name IN ('TS_PLYTIX', 'TS_INDICES'); */
-
 -- 1.2. Comprobación índices
 SELECT index_name, index_type, table_owner, table_name, uniqueness, tablespace_name 
 FROM DBA_INDEXES 
@@ -22,37 +16,31 @@ WHERE TABLE_OWNER = 'PLYTIX';
 -- 1.3. Comprobación creación tablas e importacion
 SELECT * FROM CUENTA;
 SELECT * FROM PLAN;
-SELECT * FROM USUARIO;          -- Eliminar la VPD y comprobar funcionamiento
+SELECT * FROM USUARIO;
 SELECT * FROM PRODUCTO;
 SELECT * FROM PRODUCTOS_EXT;
 
 -- 1.4. Comprobación tabla TRAZA
-
--- Crear tabla TRAZA y hacer seguimiento errores
+SELECT * FROM TRAZA;
 
 
 -- 2. Seguridad
-
 -- 2.1. Cifrado de columnas
-
---  Crear tablas con columnas encriptadas -> TDE
+SELECT * FROM V$DBA_ENCRYPTED_COLUMNS;
 
 -- 2.2 Política VPD
-
 SELECT * FROM DBA_POLICIES WHERE OBJECT_OWNER = 'PLYTIX';   -- Muestra las políticas existentes
 
 
 -- 3. Vistas
-
 -- 3.1. Crear V_PRODUCTO_PUBLICO
+SELECT * FROM V_PRODUCTO_PUBLICO;
 
 -- 3.2. VM_PRODUCTOS
-
 SELECT * FROM VM_PRODUCTOS;
 
 
 -- 4. Permisos
-
 -- 4.1. Gestión productos -> Usuario Estandar
 
 -- 4.2. Gestion Productos, Activos y Categorias
@@ -214,7 +202,7 @@ ORDER BY role;
 -- 11.5. Política de gestión de contraseñas
 
 -- 11.6. Activación de TDE y encriptación de columnas
-
+SELECT * FROM V$DBA_ENCRYPTED_COLUMNS;
 
 
 

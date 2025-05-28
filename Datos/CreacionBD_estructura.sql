@@ -260,6 +260,23 @@ ALTER TABLE usuario
     ADD CONSTRAINT usuario_cuenta_id_fk FOREIGN KEY ( cuenta_id )
         REFERENCES cuenta ( id );
 
+------------------------------------ FIN CREACION TABLAS BASE -----------------------------------
+
+-- Creacion de indices
+-- Indice simple sobre nombreusuario
+CREATE INDEX idx_nombreusuario
+ON USUARIO (NOMBREUSUARIO)
+TABLESPACE TS_INDICES;
+
+-- Indice sobre una función: UPPER(nombrecompleto)
+CREATE INDEX idx_upper_nombrecompleto
+ON USUARIO (UPPER(NOMBRECOMPLETO))
+TABLESPACE TS_INDICES;
+
+-- Crear indice bitmap sobre cuenta_id
+CREATE BITMAP INDEX idx_cuenta_usuario_bitmap
+ON USUARIO (CUENTA_ID)
+TABLESPACE TS_INDICES;
 
 -- Creacion de la tabla externa
 -- Descargamos y guardamos el archivo productos.csv en C:\app\alumnos\admin\orcl\dpdump
@@ -296,24 +313,64 @@ ORGANIZATION EXTERNAL (
 );
 
 
--- Creacion de indices
--- Indice simple sobre nombreusuario
-CREATE INDEX idx_nombreusuario
-ON USUARIO (NOMBREUSUARIO)
-TABLESPACE TS_INDICES;
-
--- Indice sobre una función: UPPER(nombrecompleto)
-CREATE INDEX idx_upper_nombrecompleto
-ON USUARIO (UPPER(NOMBRECOMPLETO))
-TABLESPACE TS_INDICES;
-
--- Crear indice bitmap sobre cuenta_id
-CREATE BITMAP INDEX idx_cuenta_usuario_bitmap
-ON USUARIO (CUENTA_ID)
-TABLESPACE TS_INDICES;
+-- Creacion de la tabla TRAZA para seguimiento de errores
+CREATE TABLE TRAZA 
+    (
+        Fecha Date,
+        Usuario VARCHAR2(40),
+        Causante VARCHAR2(40), 
+        Descripcion VARCHAR2(500) 
+    )
+    TABLESPACE TS_PLYTIX
+;
 
 
--- Creacion de la VM
+-- Cifrado de columnas
+-- SELECT * FROM DBA_ENCRYPTED_COLUMNS;     -- Comprabacion
+-- SELECT * FROM V$ENCRYPTION_WALLET;       -- Status OPEN para poder encriptar
+ALTER TABLE usuario MODIFY (correoelectronico ENCRYPT);
+ALTER TABLE usuario MODIFY (telefono ENCRYPT);
+ALTER TABLE usuario MODIFY LOB (avatar) (ENCRYPT);
+
+ALTER TABLE cuenta MODIFY (direccionfiscal ENCRYPT);
+ALTER TABLE cuenta MODIFY (nif ENCRYPT);
+
+
+-- Establecimiento de politicas de autorización VPD
+CREATE OR REPLACE FUNCTION F_GESTION_USUARIO(p_schema varchar2, p_obj varchar2)
+    RETURN varchar2
+IS
+    VUSUARIO VARCHAR2(100);
+BEGIN
+    VUSUARIO := SYS_CONTEXT('userenv', 'SESSION_USER');
+
+    IF UPPER(VUSUARIO) IN ('SYSTEM', 'ADMIN') THEN
+        RETURN '1=1';
+    ELSE
+        RETURN 'UPPER(Nombreusuario) = ''' || UPPER(VUSUARIO) || '''';
+    END IF;
+END;
+/
+
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema => 'PLYTIX',
+        object_name => 'USUARIO',
+        policy_name => 'P_GESTION_USUARIO',
+        function_schema => 'PLYTIX',
+        policy_function => 'F_GESTION_USUARIO',
+        statement_types => 'SELECT, UPDATE'
+    );
+END;
+/
+
+
+-- Creacion de V_PRODUCTO_PUBLICO
+ALTER TABLE productos ADD (PUBLICO CHAR(1) DEFAULT 'S' NOT NULL);
+CREATE OR REPLACE VIEW V_PRODUCTO_PUBLICO AS SELECT * FROM producto WHERE PUBLICO = 'S';
+
+
+-- Creacion de VM_PRODUCTOS
 CREATE MATERIALIZED VIEW VM_PRODUCTOS
     BUILD IMMEDIATE
     REFRESH COMPLETE
@@ -323,7 +380,12 @@ CREATE MATERIALIZED VIEW VM_PRODUCTOS
 ;
 
 
--- Crear secuencia
+-- Gestión de Permisos
+
+
+
+
+-- Crear secuencia y TR_PRODUCTOS
 CREATE SEQUENCE SEQ_PRODUCTOS
     START WITH 1
     INCREMENT BY 1
@@ -339,16 +401,11 @@ begin
 END TR_PRODUCTOS;
 
 
--- Creacion de la tabla TRAZA para seguimiento de errores
-CREATE TABLE TRAZA 
-    (
-        Fecha Date,
-        Usuario VARCHAR2(40),
-        Causante VARCHAR2(40), 
-        Descripcion VARCHAR2(500) 
-    )
-    TABLESPACE TS_PLYTIX
-;
 
--- Cifrado de columnas
--- SELECT * FROM DBA_ENCRYPTED_COLUMNS;  -- Comprabacion
+
+
+
+
+
+
+
