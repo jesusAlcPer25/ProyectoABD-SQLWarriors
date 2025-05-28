@@ -93,7 +93,7 @@ BEGIN
 END;
 
 
--- Usuario Estandard
+-- Usuario Estandar
 CREATE ROLE usu_est;
 
 

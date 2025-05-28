@@ -262,6 +262,7 @@ ALTER TABLE usuario
 
 ------------------------------------ FIN CREACION TABLAS BASE -----------------------------------
 
+-------- INDICES --------------------------------------------------------------------------------
 -- Creacion de indices
 -- Indice simple sobre nombreusuario
 CREATE INDEX idx_nombreusuario
@@ -278,6 +279,7 @@ CREATE BITMAP INDEX idx_cuenta_usuario_bitmap
 ON USUARIO (CUENTA_ID)
 TABLESPACE TS_INDICES;
 
+-------- IMPORTACION DATOS TABLAS ---------------------------------------------------------------
 -- Creacion de la tabla externa
 -- Descargamos y guardamos el archivo productos.csv en C:\app\alumnos\admin\orcl\dpdump
 create or replace directory directorio_ext as 'C:\app\alumnos\admin\orcl\dpdump';
@@ -312,9 +314,9 @@ ORGANIZATION EXTERNAL (
     LOCATION ('productos.csv') 
 );
 
-
+-------- TRAZA ----------------------------------------------------------------------------------
 -- Creacion de la tabla TRAZA para seguimiento de errores
-CREATE TABLE TRAZA 
+CREATE TABLE traza 
     (
         Fecha Date,
         Usuario VARCHAR2(40),
@@ -324,7 +326,7 @@ CREATE TABLE TRAZA
     TABLESPACE TS_PLYTIX
 ;
 
-
+-------- CIFRADO --------------------------------------------------------------------------------
 -- Cifrado de columnas
 -- SELECT * FROM DBA_ENCRYPTED_COLUMNS;     -- Comprabacion
 -- SELECT * FROM V$ENCRYPTION_WALLET;       -- Status OPEN para poder encriptar
@@ -335,7 +337,7 @@ ALTER TABLE usuario MODIFY LOB (avatar) (ENCRYPT);
 ALTER TABLE cuenta MODIFY (direccionfiscal ENCRYPT);
 ALTER TABLE cuenta MODIFY (nif ENCRYPT);
 
-
+-------- POLITICA VPD ---------------------------------------------------------------------------
 -- Establecimiento de politicas de autorización VPD
 CREATE OR REPLACE FUNCTION F_GESTION_USUARIO(p_schema varchar2, p_obj varchar2)
     RETURN varchar2
@@ -364,11 +366,10 @@ BEGIN
 END;
 /
 
-
+-------- VISTAS --------------------------------------------------------------------------------
 -- Creacion de V_PRODUCTO_PUBLICO
 ALTER TABLE productos ADD (PUBLICO CHAR(1) DEFAULT 'S' NOT NULL);
 CREATE OR REPLACE VIEW V_PRODUCTO_PUBLICO AS SELECT * FROM producto WHERE PUBLICO = 'S';
-
 
 -- Creacion de VM_PRODUCTOS
 CREATE MATERIALIZED VIEW VM_PRODUCTOS
@@ -379,12 +380,7 @@ CREATE MATERIALIZED VIEW VM_PRODUCTOS
     AS SELECT * FROM PRODUCTOS_EXT
 ;
 
-
--- Gestión de Permisos
-
-
-
-
+-------- TRIGER ---------------------------------------------------------------------------------
 -- Crear secuencia y TR_PRODUCTOS
 CREATE SEQUENCE SEQ_PRODUCTOS
     START WITH 1
@@ -400,7 +396,79 @@ begin
     end if; 
 END TR_PRODUCTOS;
 
+-------- SEGURIDAD Y PERMISOS -------------------------------------------------------------------
+-- Creación de roles
+--      Administrador sistema
+CREATE ROLE ROL_ADMIN IDENTIFIED BY admin;
 
+GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMIN;             -- Gestión TDE, solo un usuario
+GRANT ALTER SYSTEM TO ROL_ADMIN;
+GRANT EXECUTE ON DBMS_RLS TO ROL_ADMIN;                   -- Gestión VPD
+GRANT CREATE USER, ALTER USER, DROP USER TO ROL_ADMIN;    -- Gestión de usuarios
+GRANT GRANT ANY ROLE TO ROL_ADMIN;
+
+GRANT ALL ON activo_categoria_act TO ROL_ADMIN;           -- Gestion de tablas
+GRANT ALL ON activo TO ROL_ADMIN;    
+GRANT ALL ON atributo TO ROL_ADMIN;    
+GRANT ALL ON atributo_producto TO ROL_ADMIN;    
+GRANT ALL ON categoria TO ROL_ADMIN;    
+GRANT ALL ON categoria_activo TO ROL_ADMIN;    
+GRANT ALL ON categoria_producto TO ROL_ADMIN;    
+GRANT ALL ON cuenta TO ROL_ADMIN;    
+GRANT ALL ON plan TO ROL_ADMIN;    
+GRANT ALL ON producto_activo TO ROL_ADMIN;    
+GRANT ALL ON producto TO ROL_ADMIN;
+GRANT ALL ON productos_ext TO ROL_ADMIN;
+GRANT ALL ON usuario TO ROL_ADMIN;    
+GRANT ALL ON relacionado TO ROL_ADMIN;
+GRANT ALL ON traza TO ROL_ADMIN;
+
+GRANT RESOURCE, CONNECT TO ROL_ADMIN;                     -- Gestión recursos
+GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMIN;
+
+--      Usuario Estandar
+CREATE ROLE ROL_USUARIO;
+
+GRANT SELECT, UPDATE ON USUARIO TO ROL_USUARIO;
+GRANT SELECT ON PLAN TO ROL_USUARIO;
+
+--      Gestor cuentas
+CREATE ROLE ROL_GESTOR_CUENTA;
+
+--      Planificador Servicios
+CREATE ROLE ROL_PLAN_SERVICIOS;
+
+
+-- Gestión de Permisos
+-- RF1. Gestión rpoductos, Categoría y Activos
+GRANT SELECT, INSERT, UPDATE, DELETE ON PRODUCTO TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ACTIVO TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON activo_categoria_act TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_USUARIO;
+    --  Un producto solo puede ser de una categoría de su misma cuenta
+GRANT SELECT, INSERT, UPDATE, DELETE ON relacionado TO ROL_USUARIO;
+    -- Solo se pueden relacionar productos de la misma cuenta que debe ser la misma que la del usuario que crea la relación.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON atributo_producto TO ROL_USUARIO;
+    -- Ambos tienen que ser de la misma cuenta.
+
+
+-- RF2. Gestión de cuentas
+GRANT SELECT, INSERT, UPDATE, DELETE ON CUENTA TO ROL_GESTOR_CUENTA;
+CREATE OR REPLACE VIEW V_USUARIO_PUBLICO AS
+    SELECT id, nombreusuario, nombrecompleto, avatar, cuenta_id
+    FROM USUARIO;                                           -- Preguntar si hacer por vistas o politicas
+-- CREATE SYNONYM USUARIO FOR V_USUARIO_PUBLICO;
+GRANT SELECT ON V_USUARIO_PUBLICO TO ROL_GESTOR_CUENTA;
+
+
+-- RF3. Gestión de los planes
+GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE ON PRODUCTO TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE ON ACTIVO TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE ON CATEGORIA_PRODUCTO TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE ON CATEGORIA_ACTIVO TO ROL_PLAN_SERVICIOS;
 
 
 
