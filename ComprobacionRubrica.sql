@@ -2,22 +2,22 @@ SET ECHO ON; -- Muestra la operacion ejecutada antes del resultado
 
 ------------------------------------------ PARTE OBLIGATORIA -----------------------------------------------
 
-
 -- 1. Esquema distinto para el trabajo
 
 -- 1.1. Tablespaces TS_PLYTIX y TS_INDICES
 SELECT COUNT(*) FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_PLYTIX' OR TABLESPACE_NAME = 'TS_INDICES';
+SELECT COUNT(*) FROM V$DATAFILE WHERE UPPER(NAME) LIKE '%PLYTIX%' OR UPPER(NAME) LIKE '%INDICES%';
 
-SELECT * FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_PLYTIX';
-SELECT * FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_INDICES';
-
-SELECT owner, segment_name, segment_type, tablespace_name
+/* SELECT * FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_PLYTIX';
+SELECT * FROM DBA_TABLESPACES WHERE TABLESPACE_NAME = 'TS_INDICES'; */
+/* SELECT owner, segment_name, segment_type, tablespace_name
 FROM dba_segments
-WHERE tablespace_name IN ('TS_PLYTIX', 'TS_INDICES');
+WHERE tablespace_name IN ('TS_PLYTIX', 'TS_INDICES'); */
 
 -- 1.2. Comprobación índices
-
-SELECT index_name, index_type, table_owner, table_name, uniqueness, tablespace_name FROM USER_INDEXES;
+SELECT index_name, index_type, table_owner, table_name, uniqueness, tablespace_name 
+FROM DBA_INDEXES 
+WHERE TABLE_OWNER = 'PLYTIX';
 
 -- 1.3. Comprobación creación tablas e importacion
 SELECT * FROM CUENTA;
@@ -340,7 +340,7 @@ SYS_CONTEXT('userenv','SESSION_USER');
 
 ----------------------------------------------------------------------------------------------------------
 
-SELECT COUNT(*) FROM V$DATAFILE WHERE UPPER(NAME) LIKE '%PLYTIX%';
+
 SELECT COUNT(*) FROM DBA_ENCRYPTED_COLUMNS;
 SELECT COUNT(*) FROM DBA_INDEXES WHERE OWNER = 'PLYTIX' AND TABLESPACE_NAME = 'TS_PLYTIX';
 SELECT COUNT(*) FROM DBA_INDEXES WHERE OWNER = 'PLYTIX' AND TABLESPACE_NAME = 'TS_PLYTIX';

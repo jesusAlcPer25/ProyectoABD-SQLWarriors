@@ -1,19 +1,18 @@
 -- Ejecutar como system
 ALTER SESSION SET CURRENT_SCHEMA = PLYTIX;
 
--- Tabla de Activo->Categoria activo, esta puesto asi para que no de problemas
-CREATE TABLE ACTIVO_CAT_ACT (
+-- Tabla de Activo->Categoria_activo
+CREATE TABLE activo_categoria_act (
     activo_id                   NUMBER NOT NULL,
     categoria_activo_id         NUMBER NOT NULL,
     activo_cuenta_id            NUMBER NOT NULL,
     categoria_activo_cuenta_id  NUMBER NOT NULL,
-    CONSTRAINT ACTIVO_CATEGORIA_ACTIVO_PK PRIMARY KEY ( activo_id,
+    CONSTRAINT activo_categoria_act_pk PRIMARY KEY ( activo_id,
                                                         activo_cuenta_id,
                                                         categoria_activo_id,
                                                         categoria_activo_cuenta_id 
                                                         ) USING INDEX TABLESPACE TS_INDICES
 );
-
 
 CREATE TABLE activo (
     id        NUMBER NOT NULL,
@@ -34,12 +33,11 @@ CREATE TABLE atributo (
     CONSTRAINT atributo_pk PRIMARY KEY ( id, cuenta_id ) USING INDEX TABLESPACE TS_INDICES
 );
 
-
 CREATE TABLE atributo_producto (
     valor              NUMBER NOT NULL,
     producto_gtin      NUMBER NOT NULL,
-    atributo_id        NUMBER NOT NULL,
     producto_cuenta_id NUMBER NOT NULL,
+    atributo_id        NUMBER NOT NULL,
     atributo_cuenta_id NUMBER NOT NULL,
     CONSTRAINT atributo_producto_pk PRIMARY KEY ( producto_gtin, 
                                                     atributo_id, 
@@ -57,7 +55,6 @@ CREATE TABLE categoria (
     CONSTRAINT categoria_pk PRIMARY KEY ( id, cuenta_id ) USING INDEX TABLESPACE TS_INDICES
 );
 
-
 CREATE TABLE categoria_activo (
     id        NUMBER NOT NULL,
     nombre    VARCHAR2(30 CHAR) NOT NULL,
@@ -65,10 +62,10 @@ CREATE TABLE categoria_activo (
     CONSTRAINT categoria_activo_pk PRIMARY KEY ( id, cuenta_id ) USING INDEX TABLESPACE TS_INDICES
 );
 
-CREATE TABLE CAT_PROD (
+CREATE TABLE categoria_producto (
     categoria_id        NUMBER NOT NULL,
-    producto_gtin       NUMBER NOT NULL,
     categoria_cuenta_id NUMBER NOT NULL,
+    producto_gtin       NUMBER NOT NULL,
     producto_cuenta_id  NUMBER NOT NULL,
     CONSTRAINT CATEGORIA_PRODUCTO_PK PRIMARY KEY ( categoria_id,
                                                         producto_gtin,
@@ -76,7 +73,6 @@ CREATE TABLE CAT_PROD (
                                                         producto_cuenta_id
                                                 ) USING INDEX TABLESPACE TS_INDICES
 );
-
 
 CREATE TABLE cuenta (
     id              NUMBER NOT NULL,
@@ -89,13 +85,12 @@ CREATE TABLE cuenta (
     CONSTRAINT cuenta_pk PRIMARY KEY ( id ) USING INDEX TABLESPACE TS_INDICES
 );
 
-CREATE UNIQUE INDEX cuenta__idx ON
+CREATE UNIQUE INDEX cuenta_idx ON
     cuenta (
         usuario_id
     ASC )
 TABLESPACE TS_INDICES
 ;
-
 
 CREATE TABLE plan (
     id                 NUMBER NOT NULL,
@@ -106,12 +101,11 @@ CREATE TABLE plan (
     categoriasproducto NUMBER NOT NULL,
     categoriasactivos  NUMBER NOT NULL,
     relaciones         NUMBER NOT NULL,
-    precioanual        NUMBER NOT NULL,
+    precio             NUMBER NOT NULL,
     CONSTRAINT plan_pk PRIMARY KEY ( id ) USING INDEX TABLESPACE TS_INDICES
 );
 
-
-CREATE TABLE PROD_ACT (
+CREATE TABLE producto_activo (
     producto_gtin      NUMBER NOT NULL,
     producto_cuenta_id NUMBER NOT NULL,
     activo_id          NUMBER NOT NULL,
@@ -122,7 +116,6 @@ CREATE TABLE PROD_ACT (
                                                 activo_cuenta_id 
                                             ) USING INDEX TABLESPACE TS_INDICES
 );
-
 
 CREATE TABLE producto (
     gtin       NUMBER NOT NULL,
@@ -136,21 +129,19 @@ CREATE TABLE producto (
     CONSTRAINT producto_pk PRIMARY KEY ( gtin, cuenta_id ) USING INDEX TABLESPACE TS_INDICES
 );
 
-
 CREATE TABLE relacionado (
     nombre                          VARCHAR2(30 CHAR) NOT NULL,
     sentido                         VARCHAR2(30 CHAR),
     producto_gtin                   NUMBER NOT NULL,
     producto_cuenta_id              NUMBER NOT NULL,
     producto_relacionado_gtin       NUMBER NOT NULL,
-    -- producto_cuenta_id1 NUMBER NOT NULL,
+    producto_relacionado_cuenta_id  NUMBER NOT NULL,
     CONSTRAINT relacionado_pk PRIMARY KEY ( producto_gtin, 
                                                 producto_relacionado_gtin,
-                                                producto_cuenta_id
-                                                -- producto_cuenta_id1 
+                                                producto_cuenta_id,
+                                                producto_relacionado_cuenta_id 
                                             )USING INDEX TABLESPACE TS_INDICES
 );
-
 
 CREATE TABLE usuario (
     id             NUMBER NOT NULL,
@@ -161,27 +152,26 @@ CREATE TABLE usuario (
     telefono       VARCHAR2(20 CHAR),
     cuenta_id      NUMBER NOT NULL,
     CONSTRAINT usuario_pk PRIMARY KEY ( id ) USING INDEX TABLESPACE TS_INDICES
-
 );
 
 
 
 ALTER TABLE activo
-    ADD CONSTRAINT activo_cuenta_fk FOREIGN KEY ( cuenta_id )
+    ADD CONSTRAINT activo_cuenta_id_fk FOREIGN KEY ( cuenta_id )
         REFERENCES cuenta ( id );
 
 -- Toma la fk de activo 
-ALTER TABLE ACTIVO_CAT_ACT
-    ADD CONSTRAINT ACTIVO_CAT_ACTIVO_FK FOREIGN KEY ( activo_id, activo_cuenta_id )
+ALTER TABLE activo_categoria_act
+    ADD CONSTRAINT ACTIVO_CAT_ACT_FK FOREIGN KEY ( activo_id, activo_cuenta_id )
         REFERENCES activo ( id, cuenta_id );
 
 -- Toma la fk de categoria_activo
-ALTER TABLE ACTIVO_CAT_ACT
+ALTER TABLE activo_categoria_act
     ADD CONSTRAINT ACT_CATEGORIA_ACTIVO_FK FOREIGN KEY ( categoria_activo_id, categoria_activo_cuenta_id )                                                                               
         REFERENCES categoria_activo ( id, cuenta_id );
 
 ALTER TABLE atributo
-    ADD CONSTRAINT atributo_cuenta_fk FOREIGN KEY ( cuenta_id )
+    ADD CONSTRAINT atributo_cuenta_id_fk FOREIGN KEY ( cuenta_id )
         REFERENCES cuenta ( id );
 
 -- Toma la fk de atributo
@@ -199,14 +189,14 @@ ALTER TABLE categoria_activo
         REFERENCES cuenta ( id );
 
 ALTER TABLE categoria
-    ADD CONSTRAINT categoria_cuenta_fk FOREIGN KEY ( cuenta_id )
+    ADD CONSTRAINT categoria_cuenta_id_fk FOREIGN KEY ( cuenta_id )
         REFERENCES cuenta ( id );
 
-ALTER TABLE CAT_PROD
+ALTER TABLE categoria_producto
     ADD CONSTRAINT CATEGORIA_PROD_FK FOREIGN KEY ( categoria_id, categoria_cuenta_id )
         REFERENCES categoria ( id, cuenta_id );
 
-ALTER TABLE CAT_PROD
+ALTER TABLE categoria_producto
     ADD CONSTRAINT CAT_PRODUCTO_FK FOREIGN KEY ( producto_gtin, producto_cuenta_id )
         REFERENCES producto ( gtin, cuenta_id );
 
@@ -219,14 +209,14 @@ ALTER TABLE cuenta
         REFERENCES usuario ( id );
 
 ALTER TABLE producto
-    ADD CONSTRAINT producto_cuenta_fk FOREIGN KEY ( cuenta_id )
+    ADD CONSTRAINT producto_cuenta_id_fk FOREIGN KEY ( cuenta_id )
         REFERENCES cuenta ( id );
 
-ALTER TABLE PROD_ACT
+ALTER TABLE producto_activo
     ADD CONSTRAINT PRODUCTO_ACTIVO_Activo_FK FOREIGN KEY ( activo_id, activo_cuenta_id )
         REFERENCES activo ( id, cuenta_id );
 
-ALTER TABLE PROD_ACT
+ALTER TABLE producto_activo
     ADD CONSTRAINT PRODUCTO_ACTIVO_Producto_FK FOREIGN KEY ( producto_gtin, producto_cuenta_id )
         REFERENCES producto ( gtin, cuenta_id );
 
@@ -235,13 +225,11 @@ ALTER TABLE relacionado
         REFERENCES producto ( gtin, cuenta_id );
 
 ALTER TABLE relacionado
-    ADD CONSTRAINT producto_relacionado_fk FOREIGN KEY ( producto_relacionado_gtin )
-                                                          -- producto_cuenta_id1 )
-        REFERENCES producto ( gtin )
-                              -- cuenta_id );
+    ADD CONSTRAINT producto_relacionado_fk FOREIGN KEY ( producto_relacionado_gtin, producto_relacionado_cuenta_id )
+        REFERENCES producto ( gtin, cuenta_id );
 
 ALTER TABLE usuario
-    ADD CONSTRAINT usuario_cuenta_fk FOREIGN KEY ( cuenta_id )
+    ADD CONSTRAINT usuario_cuenta_id_fk FOREIGN KEY ( cuenta_id )
         REFERENCES cuenta ( id );
 
 -------------------------------------- INSERTS ------------------------------------------------
@@ -349,10 +337,10 @@ Insert into PLYTIX.CUENTA (ID,NOMBRE,DIRECCIONFISCAL,NIF,FECHAALTA,PLAN_ID,USUAR
 Insert into PLYTIX.CUENTA (ID,NOMBRE,DIRECCIONFISCAL,NIF,FECHAALTA,PLAN_ID,USUARIO_ID) values ('93','SecureIT Services','Calle Uría, 3, Oviedo','M2363725',to_date('30/08/22','DD/MM/RR'),'1',null);
 
 ----------- TABLE PLAN
-Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIOANUAL) values ('1','Free','100','200','1GB','3','3','3','0');
-Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIOANUAL) values ('2','Basic','1000','20000','50GB','10','10','5','7000');
-Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIOANUAL) values ('3','Enterprise','100000','100000','200GB','1000','1000','10','50000');
-Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIOANUAL) values ('4','Deluxe','200000','200000','1TB','2000','2000','20','75000');
+Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIO) values ('1','Free','100','200','1GB','3','3','3','0');
+Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIO) values ('2','Basic','1000','20000','50GB','10','10','5','7000');
+Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIO) values ('3','Enterprise','100000','100000','200GB','1000','1000','10','50000');
+Insert into PLYTIX.PLAN (ID,NOMBRE,PRODUCTOS,ACTIVOS,ALMACENAMIENTO,CATEGORIASPRODUCTO,CATEGORIASACTIVOS,RELACIONES,PRECIO) values ('4','Deluxe','200000','200000','1TB','2000','2000','20','75000');
 
 ----------- TABLE PRODUCTO
 Insert into PLYTIX.PRODUCTO (GTIN,SKU,NOMBRE,TEXTOCORTO,CREADO,MODIFICADO,CUENTA_ID) values ('1','SKU_000001','Fitness Tracker','Next-gen gaming console.',to_date('23/02/24','DD/MM/RR'),null,'2');
