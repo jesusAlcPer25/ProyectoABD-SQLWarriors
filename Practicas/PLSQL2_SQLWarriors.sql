@@ -37,7 +37,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN VARCHAR2 
     AS
         V_PLAN                          PLAN%ROWTYPE;
-        V_CUENTA                        CUENTA.ID%TYPE:
+        V_CUENTA                        CUENTA.ID%TYPE;
 
         V_NUM_PRODUCTOS                 NUMBER;
         V_NUM_ACTIVOS                   NUMBER;
@@ -116,7 +116,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         p_producto_gtin IN PRODUCTO.GTIN%TYPE,
         p_cuenta_id IN PRODUCTO.CUENTA_ID%TYPE
     )
-        RETURN VARCHAR2;
+        RETURN VARCHAR2
     IS
         V_LISTA_CATEGORIAS VARCHAR2(1000) := '';
 
@@ -296,3 +296,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
     END P_REPLICAR_ATRIBUTOS;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+END;
+/
