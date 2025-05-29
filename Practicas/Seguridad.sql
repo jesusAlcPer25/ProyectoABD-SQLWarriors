@@ -98,6 +98,20 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN_CATEGORIA TO planificador_servicios
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Crear un perfil de política de contraseñas para usuarios estándar
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE PROFILE perfil_usuario_estandar LIMIT
+    FAILED_LOGIN_ATTEMPTS 3              -- máximo 3 intentos fallidos
+    PASSWORD_LOCK_TIME 1/24              -- 1 hora bloqueado (1/24 días)
+    PASSWORD_LIFE_TIME 30                -- la contraseña caduca a los 30 días
+    PASSWORD_REUSE_TIME 90               -- no puede reutilizar contraseñas recientes por 90 días
+    PASSWORD_REUSE_MAX 5                 -- no puede usar las últimas 5 contraseñas
+    PASSWORD_VERIFY_FUNCTION verify_function; -- función que comprueba la complejidad
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- CREACIÓN DE USUARIOS
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -106,11 +120,49 @@ GRANT administrador_sistema TO admin;
 
 CREATE USER juan IDENTIFIED BY juan123;
 GRANT usuario_estandar TO juan;
+ALTER USER juan PROFILE perfil_usuario_estandar;
 
 CREATE USER pedro INDENTIFIED BY pedro123;
 GRANT gestor_cuentas TO pedro
 
 CREATE USER maria IDENTIFIED BY maria123;
 GRANT planificador_servicios TO maria;
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Poner ejemplos de usuarios realizando consultas para ver si se cumplen correctamente o no (Estos son ejemplos pa luego comprobarlos y ver si funciona bien y haacer mas)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Simula que estás actuando como el usuario Juan
+ALTER SESSION SET CURRENT_SCHEMA = juan;
+
+-- Operación que Juan puede hacer según su rol (CRUD sobre PRODUCTO)
+INSERT INTO PRODUCTO (producto_id, nombre, descripcion, cuenta_id)
+VALUES (101, 'Ratón', 'Ratón inalámbrico', 1);
+
+ALTER SESSION SET CURRENT_SCHEMA = maria;
+
+-- María puede insertar en PLAN
+INSERT INTO PLAN (plan_id, nombre, descripcion)
+VALUES (501, 'Plan Premium', 'Incluye todo');
+
+ALTER SESSION SET CURRENT_SCHEMA = gestor1;
+
+-- Modificar dirección de la cuenta
+UPDATE CUENTA SET direccion_fiscal = 'Avda. Nueva, 123' WHERE cuenta_id = 1;
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Para encryptar columnas
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Hacerlo con las columnas que queramos y ya estaria hecho
+
+ALTER TABLE USUARIO MODIFY (EMAIL ENCRYPT);
+ALTER TABLE USUARIO MODIFY (TELEFONO ENCRYPT);
+ALTER TABLE USUARIO MODIFY (NIF ENCRYPT);
+
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
