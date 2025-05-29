@@ -16,11 +16,12 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS_AVANZADO AS
                                             p_categoria_destino_id IN CATEGORIA.ID%TYPE
                                             );
 
-    PROCEDURE  P_REPLICAR_ATRIBUTOS(
+    PROCEDURE P_REPLICAR_ATRIBUTOS(
                                     p_cuenta_id IN CUENTA.ID%TYPE, 
                                     p_producto_gtin_origen IN PRODUCTO.GTIN%TYPE,
                                     p_producto_gtin_destino IN PRODUCTO.GTIN%TYPE
-                                    );    
+                                    );
+
 END;
 /
 
@@ -297,5 +298,63 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
+END;
+/
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+-- Ejercicio 5
+---------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE P_LIMPIA_TRAZA IS
+BEGIN
+    DELETE FROM traza WHERE fecha < SYSDATE - 365;  -- Más de un año
+    COMMIT;
+END;
+/
+
+BEGIN
+    DBMS_SCHEDULER.CREATE_JOB (
+        job_name        => 'J_LIMPIA_TRAZA',
+        job_type        => 'STORED_PROCEDURE',
+        job_action      => 'P_LIMPIA_TRAZA',
+        start_date      => SYSTIMESTAMP,
+        repeat_interval => 'FREQ=DAILY;BYHOUR=3;BYMINUTE=0',
+        enabled         => TRUE,
+        comments        => 'Elimina registros de la tabla TRAZA con más de un año.'
+    );
+
+    DBMS_SCHEDULER.ENABLE('J_LIMPIA_TRAZA');
+END;
+/
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+-- Ejercicio 6
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+BEGIN
+    DBMS_SCHEDULER.CREATE_JOB (
+        job_name        => 'J_ACTUALIZA_PRODUCTOS',
+        job_type        => 'STORED_PROCEDURE',
+        job_action      => 'PKG_ADMIN_PRODUCTOS.P_ACTUALIZAR_PRODUCTOS',
+        number_of_arguments => 1,
+        start_date      => SYSTIMESTAMP,
+        repeat_interval => 'FREQ=WEEKLY;BYDAY=SUN;BYHOUR=2;BYMINUTE=0',
+        enabled         => FALSE,  -- Lo habilitamos luego de definir el parámetro
+        comments        => 'Actualiza la tabla de productos desde PRODUCTOS_EXT'
+    );
+
+    -- Definir el parámetro p_cuenta_id, por ejemplo, para la cuenta 1
+    DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE(
+        job_name  => 'J_ACTUALIZA_PRODUCTOS',
+        argument_position => 1,
+        argument_value    => '1'
+    );
+
+    -- Habilitar el job
+    DBMS_SCHEDULER.ENABLE('J_ACTUALIZA_PRODUCTOS');
 END;
 /

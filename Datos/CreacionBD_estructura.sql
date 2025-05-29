@@ -87,7 +87,7 @@ CREATE TABLE categoria_producto (
     categoria_cuenta_id NUMBER NOT NULL,
     producto_gtin       NUMBER NOT NULL,
     producto_cuenta_id  NUMBER NOT NULL,
-    CONSTRAINT CATEGORIA_PRODUCTO_PK PRIMARY KEY ( categoria_id,
+    CONSTRAINT categoria_producto_pk PRIMARY KEY ( categoria_id,
                                                         producto_gtin,
                                                         categoria_cuenta_id,
                                                         producto_cuenta_id
@@ -401,13 +401,13 @@ END TR_PRODUCTOS;
 --      Administrador sistema
 CREATE ROLE ROL_ADMIN IDENTIFIED BY admin;
 
-GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMIN;             -- Gestión TDE, solo un usuario
+GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMIN;               -- Gestión TDE, solo un usuario
 GRANT ALTER SYSTEM TO ROL_ADMIN;
-GRANT EXECUTE ON DBMS_RLS TO ROL_ADMIN;                   -- Gestión VPD
-GRANT CREATE USER, ALTER USER, DROP USER TO ROL_ADMIN;    -- Gestión de usuarios
+GRANT EXECUTE ON DBMS_RLS TO ROL_ADMIN;                     -- Gestión VPD
+GRANT CREATE USER, ALTER USER, DROP USER TO ROL_ADMIN;      -- Gestión de usuarios
 GRANT GRANT ANY ROLE TO ROL_ADMIN;
 
-GRANT ALL ON activo_categoria_act TO ROL_ADMIN;           -- Gestion de tablas
+GRANT ALL ON activo_categoria_act TO ROL_ADMIN;             -- Gestion de tablas
 GRANT ALL ON activo TO ROL_ADMIN;    
 GRANT ALL ON atributo TO ROL_ADMIN;    
 GRANT ALL ON atributo_producto TO ROL_ADMIN;    
@@ -423,33 +423,36 @@ GRANT ALL ON usuario TO ROL_ADMIN;
 GRANT ALL ON relacionado TO ROL_ADMIN;
 GRANT ALL ON traza TO ROL_ADMIN;
 
-GRANT RESOURCE, CONNECT TO ROL_ADMIN;                     -- Gestión recursos
+GRANT RESOURCE, CONNECT TO ROL_ADMIN;                       -- Gestión conexión y recursos
 GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMIN;
 
 --      Usuario Estandar
 CREATE ROLE ROL_USUARIO;
 
 GRANT SELECT, UPDATE ON USUARIO TO ROL_USUARIO;
-GRANT SELECT ON PLAN TO ROL_USUARIO;
+GRANT SELECT ON plan TO ROL_USUARIO;
+GRANT RESOURCE, CONNECT TO ROL_USUARIO;                     -- Gestión conexión y recursos
 
 --      Gestor cuentas
 CREATE ROLE ROL_GESTOR_CUENTA;
+GRANT RESOURCE, CONNECT TO ROL_GESTOR_CUENTA;               -- Gestión conexión y recursos
 
 --      Planificador Servicios
 CREATE ROLE ROL_PLAN_SERVICIOS;
+GRANT RESOURCE, CONNECT TO ROL_PLAN_SERVICIOS;              -- Gestión conexión y recursos
 
 
 -- Gestión de Permisos
 -- RF1. Gestión rpoductos, Categoría y Activos
-GRANT SELECT, INSERT, UPDATE, DELETE ON PRODUCTO TO ROL_USUARIO;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ACTIVO TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON activo TO ROL_USUARIO;
 GRANT SELECT, INSERT, UPDATE, DELETE ON activo_categoria_act TO ROL_USUARIO;
 GRANT SELECT, INSERT, UPDATE, DELETE ON categoria TO ROL_USUARIO;
 GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_USUARIO;
     --  Un producto solo puede ser de una categoría de su misma cuenta
 GRANT SELECT, INSERT, UPDATE, DELETE ON relacionado TO ROL_USUARIO;
     -- Solo se pueden relacionar productos de la misma cuenta que debe ser la misma que la del usuario que crea la relación.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO TO ROL_USUARIO;
+GRANT SELECT, INSERT, UPDATE, DELETE ON atributo TO ROL_USUARIO;
 GRANT SELECT, INSERT, UPDATE, DELETE ON atributo_producto TO ROL_USUARIO;
     -- Ambos tienen que ser de la misma cuenta.
 
@@ -460,15 +463,15 @@ CREATE OR REPLACE VIEW V_USUARIO_PUBLICO AS
     SELECT id, nombreusuario, nombrecompleto, avatar, cuenta_id
     FROM USUARIO;                                           -- Preguntar si hacer por vistas o politicas
 -- CREATE SYNONYM USUARIO FOR V_USUARIO_PUBLICO;
-GRANT SELECT ON V_USUARIO_PUBLICO TO ROL_GESTOR_CUENTA;
+GRANT SELECT, UPDATE ON V_USUARIO_PUBLICO TO ROL_GESTOR_CUENTA;
 
 
 -- RF3. Gestión de los planes
-GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE ON PRODUCTO TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE ON ACTIVO TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE ON CATEGORIA_PRODUCTO TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE ON CATEGORIA_ACTIVO TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON plan TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON activo TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_PLAN_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_activo TO ROL_PLAN_SERVICIOS;
 
 
 

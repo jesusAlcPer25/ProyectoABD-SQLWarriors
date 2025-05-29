@@ -30,7 +30,10 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
     EXCEPTION EXCEPTION_ASOCIACION_DUPLICADA;
     EXCEPTION EXCEPTION_USUARIO_EXISTE;
     
-    FUNCTION F_OBTENER_PLAN_CUENTA(P_CUENTA_ID IN CUENTA.ID%TYPE) 
+    FUNCTION F_OBTENER_PLAN_CUENTA
+        (
+            P_CUENTA_ID IN CUENTA.ID%TYPE
+        ) 
         RETURN PLAN%ROWTYPE;
 
     FUNCTION F_CONTAR_PRODUCTOS_CUENTA
@@ -96,31 +99,54 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 1
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    FUNCTION F_OBTENER_PLAN_CUENTA(P_CUENTA_ID IN CUENTA.ID%TYPE) 
+    FUNCTION F_OBTENER_PLAN_CUENTA
+        (
+            P_CUENTA_ID IN CUENTA.ID%TYPE
+        ) 
         RETURN PLAN%ROWTYPE 
     AS
         V_PLAN              PLAN%ROWTYPE;
-        V_CUENTA            CUENTA%ROWTYPE;
-        V_CUENTA_CONTADOR   NUMBER;
+        V_PLAN_ID           PLAN.ID%TYPE;
+        -- V_CUENTA            CUENTA%ROWTYPE;
+        -- V_CUENTA_CONTADOR   NUMBER;
         V_MENSAJE           VARCHAR2(500);
     BEGIN
-        SELECT COUNT(*) INTO V_CUENTA_CONTADOR 
-            FROM CUENTA WHERE ID = P_CUENTA_ID
-            FOR UPDATE;
+        
+        BEGIN
+            SELECT PLAN INTO V_PLAN_ID
+            FROM CUENTA
+            WHERE ID = P_CUENTA_ID;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                INSERT INTO TRAZA VALUES (
+                    SYSDATE, USER, $$PLSQL_UNIT,
+                    'Cuenta no encontrada con ID=' || P_CUENTA_ID
+                );
+                RAISE;
+        END;
+        
+        /* SELECT COUNT(*) INTO V_CUENTA_CONTADOR 
+            FROM CUENTA 
+            WHERE ID = P_CUENTA_ID;
 
         IF V_CUENTA_CONTADOR = 0 THEN
-            -- INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));
             RAISE NO_DATA_FOUND;
-        END IF;
+        END IF; */
 
-        SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
-        
-        IF V_CUENTA.PLAN IS NULL THEN
-            -- INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Plan no asignado a la cuenta con ID'||P_CUENTA_ID);
+        IF V_PLAN_ID IS NULL THEN
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
             RAISE EXCEPTION_PLAN_NO_ASIGNADO;
         END IF;
+
+        /* SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
         
-        SELECT * INTO V_PLAN FROM PLAN WHERE ID = V_CUENTA.PLAN;
+        IF V_CUENTA.PLAN IS NULL THEN
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Plan no asignado a la cuenta con ID'||P_CUENTA_ID);
+            RAISE EXCEPTION_PLAN_NO_ASIGNADO;
+        END IF; */
+        
+        SELECT * INTO V_PLAN FROM PLAN WHERE ID = V_PLAN_ID;
         
         RETURN V_PLAN;
     EXCEPTION   -- Si ocurre cualquier error lo guardamos en la tabla traza
@@ -129,7 +155,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
@@ -141,7 +168,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 2
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    FUNCTION F_CONTAR_PRODUCTOS_CUENTA( P_CUENTA_ID IN CUENTA.ID%TYPE ) 
+    FUNCTION F_CONTAR_PRODUCTOS_CUENTA
+        ( 
+            P_CUENTA_ID IN CUENTA.ID%TYPE
+        ) 
         RETURN NUMBER 
     IS
         V_TOTAL     NUMBER;
@@ -162,12 +192,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN V_TOTAL;
 
     EXCEPTION
-        WHEN OTHERS THEN
+        WHEN OTHERS THEN 
             INSERT INTO TRAZA VALUES (
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
@@ -209,12 +240,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN V_TOTAL_ATRIBUTOS = V_ATRIBUTOS_CON_VALOR;
 
     EXCEPTION
-        WHEN OTHERS THEN
+        WHEN OTHERS THEN 
             INSERT INTO TRAZA VALUES (
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
@@ -248,12 +280,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN V_TOTAL;
 
     EXCEPTION
-        WHEN OTHERS THEN
+        WHEN OTHERS THEN 
             INSERT INTO TRAZA VALUES (
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
@@ -293,12 +326,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = p_cuenta_id;
 
     EXCEPTION
-        WHEN OTHERS THEN
+        WHEN OTHERS THEN 
             INSERT INTO TRAZA VALUES (
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
@@ -353,12 +387,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             VALUES (p_producto_gtin, p_activo_id);
 
     EXCEPTION
-        WHEN OTHERS THEN
+        WHEN OTHERS THEN 
             INSERT INTO TRAZA VALUES (
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
@@ -402,15 +437,16 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
     EXCEPTION
-        WHEN OTHERS THEN
+        WHEN OTHERS THEN 
             INSERT INTO TRAZA VALUES (
                 SYSDATE,                                    -- Fecha
                 USER,                                       -- Usuario
                 $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
-            RAISE;
+            RAISE;                                          -- Para propagar yo el error
 
     END P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES;
 
@@ -460,15 +496,16 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                 END IF;
                 
             EXCEPTION
-                WHEN OTHERS THEN
+                WHEN OTHERS THEN 
                     INSERT INTO TRAZA VALUES (
                         SYSDATE,                                    -- Fecha
                         USER,                                       -- Usuario
                         $$PLSQL_UNIT,                               -- Causante
-                        SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
+                        SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+                    );
                     V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
                     DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
-                    RAISE;
+                    RAISE;                                          -- Para propagar yo el error
             END;
 
         END LOOP;
@@ -516,15 +553,16 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         VALUES (p_usuario.ID, p_usuario.NOMBRE_USUARIO, p_usuario.NOMBRECOMPLETO, p_usuario.AVATAR, p_usuario.EMIAL, p_usuario.TELEFONO, p_usuario.CUENTA_ID);
 
     EXCEPTION
-            WHEN OTHERS THEN
-                INSERT INTO TRAZA VALUES (
-                    SYSDATE,                                    -- Fecha
-                    USER,                                       -- Usuario
-                    $$PLSQL_UNIT,                               -- Causante
-                    SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500));    -- Descripcion
-                V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-                DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
-                RAISE;
+        WHEN OTHERS THEN 
+            INSERT INTO TRAZA VALUES (
+                SYSDATE,                                    -- Fecha
+                USER,                                       -- Usuario
+                $$PLSQL_UNIT,                               -- Causante
+                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
+            );
+            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            RAISE;                                          -- Para propagar yo el error
 
     END P_CREAR_USUARIO;
 

@@ -42,15 +42,21 @@ SELECT * FROM VM_PRODUCTOS;
 
 -- 4. Permisos
 -- 4.1. Gestión productos -> Usuario Estandar
-
 -- 4.2. Gestion Productos, Activos y Categorias
-
 -- 4.3. Gestion Atributos, Relación entre Productos
-
 -- 4.4. Gestión de las cuentas
-
 -- 4.5. Gestión de los planes
+SELECT * FROM DBA_SYS_PRIVS WHERE GRANTEE IN (
+    SELECT ROLE FROM DBA_ROLES WHERE ORACLE_MAINTAINED = 'N'   -- Muestra los roles creados por el usuario
+);
 
+SELECT * FROM DBA_ROLE_PRIVS WHERE GRANTEE IN (
+    SELECT ROLE FROM DBA_ROLES WHERE ORACLE_MAINTAINED = 'N'
+);
+
+SELECT * FROM DBA_TAB_PRIVS WHERE GRANTEE IN (
+    SELECT ROLE FROM DBA_ROLES WHERE ORACLE_MAINTAINED = 'N'
+);
 
 -- 5. Paquetes PL/SQL
 
@@ -188,10 +194,7 @@ WHERE trigger_name = 'TR_PRODUCTOS';        -- Muestra el código del trigger
 -- 11. Seguridad
 
 -- 11.1. Creación de roles adecuados
-SELECT *
-FROM dba_roles
-WHERE oracle_maintained = 'N'
-ORDER BY role;
+SELECT ROLE FROM DBA_ROLES WHERE ORACLE_MAINTAINED = 'N';
 
 -- 11.2. Asignación de roles a usuarios
 
@@ -202,6 +205,7 @@ ORDER BY role;
 -- 11.5. Política de gestión de contraseñas
 
 -- 11.6. Activación de TDE y encriptación de columnas
+SELECT * FROM V$ENCRYPTION_WALLET;       -- Status OPEN para poder encriptar
 SELECT * FROM V$DBA_ENCRYPTED_COLUMNS;
 
 
