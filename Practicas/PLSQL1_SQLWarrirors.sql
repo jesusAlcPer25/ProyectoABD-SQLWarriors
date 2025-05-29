@@ -1,4 +1,4 @@
--- Tabla de traza (LOG) 
+/* -- Tabla de traza (LOG) 
 CREATE TABLE TRAZA 
     (
         Fecha Date,
@@ -21,7 +21,7 @@ BEGIN
     NULL;
     -- EXCEPTION ...
 END;
-/
+/ */
 ---------------- Para crear el paquete ------------------------------
 CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
 
@@ -87,6 +87,12 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
         (
             P_CUENTA_ID IN CUENTA.ID%TYPE
         );
+
+    PROCEDURE LOG_ERROR
+        (  
+            p_mensaje IN VARCHAR2
+        );
+
 END;
 /
 
@@ -95,70 +101,49 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
   -- Si se crea una funcion aqui pero no se especifica arriba, la funcion es privada al paquete
 
+    PROCEDURE LOG_ERROR (p_mensaje IN VARCHAR2)
+    IS
+        PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, p_mensaje);
+        COMMIT;
+    END LOG_ERROR;
+
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 -- Ejercicio 1
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    FUNCTION F_OBTENER_PLAN_CUENTA
-        (
-            P_CUENTA_ID IN CUENTA.ID%TYPE
-        ) 
+    FUNCTION F_OBTENER_PLAN_CUENTA (
+        P_CUENTA_ID IN CUENTA.ID%TYPE
+    ) 
         RETURN PLAN%ROWTYPE 
     AS
         V_PLAN              PLAN%ROWTYPE;
         V_PLAN_ID           PLAN.ID%TYPE;
-        -- V_CUENTA            CUENTA%ROWTYPE;
-        -- V_CUENTA_CONTADOR   NUMBER;
-        V_MENSAJE           VARCHAR2(500);
     BEGIN
-        
         BEGIN
             SELECT PLAN INTO V_PLAN_ID
             FROM CUENTA
             WHERE ID = P_CUENTA_ID;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                INSERT INTO TRAZA VALUES (
-                    SYSDATE, USER, $$PLSQL_UNIT,
-                    'Cuenta no encontrada con ID=' || P_CUENTA_ID
-                );
+                LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
                 RAISE;
         END;
-        
-        /* SELECT COUNT(*) INTO V_CUENTA_CONTADOR 
-            FROM CUENTA 
-            WHERE ID = P_CUENTA_ID;
-
-        IF V_CUENTA_CONTADOR = 0 THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));
-            RAISE NO_DATA_FOUND;
-        END IF; */
 
         IF V_PLAN_ID IS NULL THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
+            LOG_ERROR('Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
             RAISE EXCEPTION_PLAN_NO_ASIGNADO;
         END IF;
-
-        /* SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
-        
-        IF V_CUENTA.PLAN IS NULL THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Plan no asignado a la cuenta con ID'||P_CUENTA_ID);
-            RAISE EXCEPTION_PLAN_NO_ASIGNADO;
-        END IF; */
         
         SELECT * INTO V_PLAN FROM PLAN WHERE ID = V_PLAN_ID;
         
         RETURN V_PLAN;
+        
     EXCEPTION   -- Si ocurre cualquier error lo guardamos en la tabla traza
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
     END F_OBTENER_PLAN_CUENTA;
 
@@ -168,20 +153,19 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 2
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    FUNCTION F_CONTAR_PRODUCTOS_CUENTA
-        ( 
-            P_CUENTA_ID IN CUENTA.ID%TYPE
-        ) 
+    FUNCTION F_CONTAR_PRODUCTOS_CUENTA ( 
+        P_CUENTA_ID IN CUENTA.ID%TYPE
+    ) 
         RETURN NUMBER 
     IS
         V_TOTAL     NUMBER;
         V_CUENTA    CUENTA%ROWTYPE;
-        V_MENSAJE   VARCHAR2(500);
     BEGIN
         
         SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
         
         IF V_CUENTA IS NULL THEN
+            LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
         
@@ -193,14 +177,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
     END F_CONTAR_PRODUCTOS_CUENTA;
 
@@ -219,14 +197,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         V_TOTAL_ATRIBUTOS       NUMBER;
         V_ATRIBUTOS_CON_VALOR   NUMBER;
         V_AUX                   PRODUCTO.GTIN%TYPE;
-        V_MENSAJE               VARCHAR2(500);
     BEGIN
     
         SELECT GTIN INTO V_AUX
             FROM PRODUCTO
             WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = P_CUENTA_ID;
 
-        IF V_AUX IS NULL THEN 
+        IF V_AUX IS NULL THEN
+            LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
 
@@ -241,14 +219,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
     
     END F_VALIDAR_ATRIBUTOS_PRODUCTO;
@@ -259,17 +231,19 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 4
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    FUNCTION F_NUM_CATEGORIAS_CUENTA( p_cuenta_id IN CUENTA.ID%TYPE ) 
+    FUNCTION F_NUM_CATEGORIAS_CUENTA ( 
+        p_cuenta_id IN CUENTA.ID%TYPE
+    ) 
         RETURN NUMBER 
     IS
         V_TOTAL             NUMBER;
         V_CUENTA            CUENTA%ROWTYPE;
-        V_MENSAJE           VARCHAR2(500);
     BEGIN
         
         SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
         
         IF V_CUENTA IS NULL THEN
+            LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
 
@@ -281,14 +255,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
 
     END F_NUM_CATEGORIAS_CUENTA;
@@ -303,22 +271,22 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         P_PRODUCTO_GTIN IN PRODUCTO.GTIN%TYPE,
         p_cuenta_id     IN PRODUCTO.CUENTA_ID%TYPE,
         p_nuevo_nombre  IN PRODUCTO.NOMBRE%TYPE
-    ) 
-    IS
-        V_AUX           PRODUCTO.GTIN%TYPE;
-        V_MENSAJE       VARCHAR2(500);
+    ) IS
+        V_GTIN          PRODUCTO.GTIN%TYPE;
     BEGIN
 
-        SELECT GTIN INTO V_AUX
+        SELECT GTIN INTO V_GTIN
             FROM PRODUCTO
             WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = P_CUENTA_ID;
 
-        IF V_AUX IS NULL THEN 
+        IF V_GTIN IS NULL THEN
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
     
         IF p_nuevo_nombre IS NULL OR TRIM(p_nuevo_nombre) = '' THEN
-        RAISE INVALID_DATA;
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Nombre introducido nulo = ' || p_nuevo_nombre);
+            RAISE INVALID_DATA;
         END IF;
 
         UPDATE PRODUCTO
@@ -327,14 +295,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' ||  SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
 
     END P_ACTUALIZAR_NOMBRE_PRODUCTO;
@@ -351,51 +313,54 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         p_activo_id            IN ACTIVOS.ID%TYPE,
         p_activo_cuenta_id     IN ACTIVOS.CUENTA_ID%TYPE
     ) IS
-        V_AUX           PRODUCTO.GTIN%TYPE;
+        V_AUX           NUMBER;
         V_GTIN          PRODUCTO.GTIN%TYPE;
-        V_ACTIVO        ACTIVO.ID%TYPE;
-        v_mensaje       VARCHAR2(500);
+        V_ACTIVO_ID     ACTIVO.ID%TYPE;
     BEGIN
 
         SELECT GTIN, CUENTA_ID INTO V_GTIN
             FROM PRODUCTO
             WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = p_producto_cuenta_id;
 
-        SELECT ID INTO V_ACTIVO
+        SELECT ID INTO V_ACTIVO_ID
             FROM ACTIVO
             WHERE P_ACTIVO_ID = P_ACTIVO_CUENTA_ID;
 
-        IF V_GTIN IS NULL OR V_ACTIVO IS NULL THEN 
+        IF V_GTIN IS NULL OR V_ACTIVO_ID IS NULL THEN
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Producto o activo no existente. GTIN = '||V_GTIN|| ' V_ACTIVO = '||V_ACTIVO ); 
             RAISE NO_DATA_FOUND;
         END IF;
         
--------------------------------------- PREGUNTAR PROFE --------------------------------------
         BEGIN
-            SELECT PRODUCTO_GTIN, ACTIVO_ID INTO V_AUX
-                FROM PROD_ACT
-                WHERE PRODUCTO_GTIN = p_producto_gtin AND ACTIVO_ID = p_activo_id;
-            
+            SELECT 1 INTO V_AUX 
+                FROM producto_activo
+                WHERE PRODUCTO_GTIN = p_producto_gtin
+                        AND PRODUCTO_CUENTA_ID = p_producto_cuenta_id
+                        AND ACTIVO_ID = p_activo_id
+                        AND ACTIVO_CUENTA_ID = p_activo_cuenta_id;
+
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Asociación ya existe entre producto y activo.');
+
             RAISE EXCEPTION_ASOCIACION_DUPLICADA;
 
         EXCEPTION
-            WHEN EXCEPTION_ASOCIACION_DUPLICADA THEN 
-                RAISE;
+            WHEN NO_DATA_FOUND THEN 
+                NULL;   -- No existe la asociación, seguimos
         END;
----------------------------------------------------------------------------------------------
 
-        INSERT INTO PROD_ACT (PRODUCTO_GTIN, ACTIVO_ID)
-            VALUES (p_producto_gtin, p_activo_id);
+        INSERT INTO producto_activo (
+                producto_gtin, producto_cuenta_id,
+                activo_id, activo_cuenta_id
+            )
+            VALUES (
+                p_producto_gtin, p_producto_cuenta_id,
+                p_activo_id, p_activo_cuenta_id
+            );
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
 
     END P_ASOCIAR_ACTIVO_A_PRODUCTO;
@@ -406,46 +371,41 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 7
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    PROCEDURE P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES(
+    PROCEDURE P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES (
         p_producto_gtin     IN PRODUCTO.GTIN%TYPE,
         p_cuenta_id         IN PRODUCTO.CUENTA_ID%TYPE
     ) IS
         V_AUX               PRODUCTO.GTIN%TYPE;
-        v_mensaje           VARCHAR2(500);
     BEGIN
         SELECT GTIN INTO V_AUX
         FROM PRODUCTO
         WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
-        IF V_AUX IS NULL THEN 
+        IF V_AUX IS NULL THEN
+            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Producto no encontrado para eliminar. GTIN = '||V_AUX); 
             RAISE NO_DATA_FOUND;
         END IF;
 
-        DELETE FROM ACT_PRO
-        WHERE PRODUCTO_GTIN = p_producto_gtin;
+        DELETE FROM producto_activo
+        WHERE PRODUCTO_GTIN = p_producto_gtin AND PRODUCTO_CUENTA_ID = p_cuenta_id;
 
-        DELETE FROM ATRIBUTO_PRODUCTO
+        DELETE FROM atributo_producto
         WHERE PRODUCTO_GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
-        DELETE FROM PROD_CAT
-        WHERE PRODUCTO_GTIN = p_producto_gtin;
+        DELETE FROM categoria_producto
+        WHERE PRODUCTO_GTIN = p_producto_gtin AND PRODUCTO_CUENTA_ID = p_cuenta_id; 
 
-        DELETE FROM RELACIONADO
-        WHERE PRODUCTO1 = p_producto_gtin OR PRODUCTO2 = p_producto_gtin;
+        DELETE FROM relacionado
+        WHERE (PRODUCTO_GTIN = p_producto_gtin AND PRODUCTO_CUENTA_ID = p_cuenta_id)
+            OR (PRODUCTO_RELACIONADO_GTIN = p_producto_gtin AND PRODUCTO_RELACIONADO_CUENTA_ID = p_cuenta_id);
 
-        DELETE FROM PRODUCTO
+        DELETE FROM producto
         WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
-            V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-            DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
 
     END P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES;
@@ -456,62 +416,71 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 -- Ejercicio 8
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-    PROCEDURE P_ACTUALIZAR_PRODUCTOS( p_cuenta_id IN CUENTA.ID%TYPE )
+    PROCEDURE P_ACTUALIZAR_PRODUCTOS (
+        p_cuenta_id IN CUENTA.ID%TYPE 
+    )
     IS
-        CURSOR cur_productos
-        IS
-            SELECT GTIN, CUENTA_ID
-            FROM PRODUCTO_EXT
+        CURSOR cur_ext IS
+            SELECT SKU, NOMBRE, TEXTOCORTO, CREADO
+            FROM PRODUCTOS_EXT
             WHERE CUENTA_ID = p_cuenta_id;
 
-        V_AUX               PRODUCTO.GTIN%TYPE;
-        V_AUX_2             PRODUCTO.NOMBRE%TYPE;
-        v_gtin              PRODUCTO.GTIN%TYPE;
-        v_cuenta_id         PRODUCTO.CUENTA_ID%TYPE;
-        V_NOMBRE            PRODUCTO.NOMBRE%TYPE;
-        v_mensaje           VARCHAR2(500);
+        CURSOR cur_eliminar IS
+            SELECT GTIN, SKU
+            FROM PRODUCTO
+            WHERE CUENTA_ID = p_cuenta_id
+            AND SKU NOT IN ( SELECT SKU FROM PRODUCTOS_EXT WHERE CUENTA_ID = p_cuenta_id );
+
+        v_prod_gtin          PRODUCTO.GTIN%TYPE;
+        v_prod_nombre        PRODUCTO.NOMBRE%TYPE;
+
     BEGIN
-        FOR prod IN cur_productos LOOP
-            v_gtin := prod.GTIN;
-            v_cuenta_id := prod.CUENTA_ID;
-            V_NOMBRE := prod.NOMBRE;
-
+       -- 1. Inserción o actualización
+        FOR prod_ex IN cur_ext LOOP
             BEGIN
-                SELECT GTIN INTO V_AUX
-                    FROM PRODUCTO
-                    WHERE GTIN = v_gtin AND CUENTA_ID = v_cuenta_id;
 
-                SELECT NOMBRE INTO V_AUX_2
-                    FROM PRODUCTO
-                    WHERE GTIN = v_gtin AND CUENTA_ID = v_cuenta_id;
+                SELECT GTIN, NOMBRE INTO v_prod_gtin, v_prod_nombre
+                FROM PRODUCTO
+                WHERE SKU = prod_ex.SKU AND CUENTA_ID = p_cuenta_id;
 
-                IF V_AUX IS NULL THEN
-                    INSERT INTO PRODUCTO VALUES(
-                        SELECT * FROM cur_productos -- Comprobar si hay que añadir mas parametros a producto
-                    );
-                ELSIF (NOT V_AUX IS NULL) AND (V_NOMBRE != V_AUX_2) THEN
-                    P_ACTUALIZAR_NOMBRE_PRODUCTO(v_gtin, v_cuenta_id, V_NOMBRE);
-                ELSE
-                    P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES(v_gtin, v_cuenta_id);
+                IF prod_ex.NOMBRE != v_prod_nombre THEN
+                    P_ACTUALIZAR_NOMBRE_PRODUCTO(v_prod_gtin, p_cuenta_id, prod_ex.NOMBRE);
                 END IF;
+
+            EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                    INSERT INTO PRODUCTO ( GTIN, SKU, NOMBRE, TEXTOCORTO, CREADO, CUENTA_ID )
+                        VALUES (
+                            prod_ex.SKU, prod_ex.NOMBRE, prod_ex.TEXTOCORTO, prod_ex.CREADO, p_cuenta_id
+                        );
+                WHEN OTHERS THEN
+                    LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+                    DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500));
+                    RAISE;
+            END;
+        END LOOP;
+
+        -- 2. Eliminacion productos que no estén en producto_ext
+        FOR prod IN cur_eliminar LOOP
+            BEGIN
+
+                P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES(prod.GTIN, p_cuenta_id);
                 
             EXCEPTION
-                WHEN OTHERS THEN 
-                    INSERT INTO TRAZA VALUES (
-                        SYSDATE,                                    -- Fecha
-                        USER,                                       -- Usuario
-                        $$PLSQL_UNIT,                               -- Causante
-                        SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-                    );
-                    V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
-                    DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
-                    RAISE;                                          -- Para propagar yo el error
+                WHEN OTHERS THEN
+                    LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+                    DBMS_OUTPUT.PUT_LINE('ERROR AL ELIMINAR: ' || SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500));
+                    RAISE;
             END;
-
         END LOOP;
+
+    EXCEPTION
+        WHEN OTHERS THEN 
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
+            RAISE;                                          -- Para propagar yo el error
         
     END P_ACTUALIZAR_PRODUCTOS;
-
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -523,43 +492,34 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         p_rol             IN VARCHAR2,
         p_password        IN VARCHAR2
     ) IS
-        V_AUX     USUARIO.ID%TYPE;
-        v_mensaje   VARCHAR2(500);
+        v_sql               VARCHAR2(500);
+        v_mensaje           VARCHAR2(500);
     BEGIN
-        SELECT ID INTO V_AUX
-            FROM USUARIO
-            WHERE ID = p_id;
+        -- Crear usuario 
+        v_sql := 'CREATE USER ' || p_usuario.nombreusuario || 
+             ' IDENTIFIED BY "' || p_password || '" DEFAULT TABLESPACE TS_PLYTIX ';
+        EXECUTE IMMEDIATE v_sql;
 
-        IF NOT V_AUX IS NULL THEN
-            RAISE EXCEPTION_USUARIO_EXISTE;
-        END IF;
+        -- Asignacion de rol
+        v_sql := 'GRANT ' || p_rol || ' TO ' || p_usuario.nombreusuario;
+        EXECUTE IMMEDIATE v_sql;
 
-        BEGIN
-            SELECT ID INTO V_AUX
-                FROM USUARIO
-                WHERE EMAIL = p_usuario.EMAIL;
-
-            IF NOT V_AUX IS NULL THEN
-                RAISE EXCEPTION_USUARIO_EXISTE;
-            END IF;
-        END;
-
-        IF (p_usuario.ID IS NULL) OR (p_usuario.NOMBRE_USUARIO IS NULL) OR (p_usuario.NOMBRECOMPLETO IS NULL) OR (p_usuario.CUENTA_ID IS NULL) THEN
+        IF (p_usuario.ID IS NULL) OR (p_usuario.NOMBREUSUARIO IS NULL) OR (p_usuario.NOMBRECOMPLETO IS NULL) OR (p_usuario.CUENTA_ID IS NULL) THEN
+            LOG_ERROR(
+                    'Valores nulos en campos NOT NULL. ID= '||p_usuario.ID||
+                    'NombreUsuario= '||p_usuario.nombreusuario||
+                    'NombreCompleto= '||p_usuario.NOMBRECOMPLETO||
+                    'Cuenta_id= '||p_usuario.CUENTA_ID
+            );
             RAISE INVALID_DATA;
         END IF;
 
         -- Insertar nuevo usuario
-        INSERT INTO USUARIO(ID, NOMBRE_USUARIO, NOMBRECOMPLETO, AVATAR, EMAIL, TELEFONO, CUENTA_ID)
-        VALUES (p_usuario.ID, p_usuario.NOMBRE_USUARIO, p_usuario.NOMBRECOMPLETO, p_usuario.AVATAR, p_usuario.EMIAL, p_usuario.TELEFONO, p_usuario.CUENTA_ID);
+        INSERT INTO USUARIO VALUES p_usuario;
 
     EXCEPTION
         WHEN OTHERS THEN 
-            INSERT INTO TRAZA VALUES (
-                SYSDATE,                                    -- Fecha
-                USER,                                       -- Usuario
-                $$PLSQL_UNIT,                               -- Causante
-                SQLCODE||' '||SUBSTR(SQL_ERRM, 1, 500)      -- Descripcion
-            );
+            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
             V_MENSAJE := SUBSTR(SQLCODE||' '||SQLERRM, 1, 500);
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || V_MENSAJE);   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error

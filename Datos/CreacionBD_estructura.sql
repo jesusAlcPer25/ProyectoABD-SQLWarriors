@@ -347,7 +347,7 @@ BEGIN
     VUSUARIO := SYS_CONTEXT('userenv', 'SESSION_USER');
 
     IF UPPER(VUSUARIO) IN ('SYSTEM', 'ADMIN') THEN
-        RETURN '1=1';
+        RETURN '';
     ELSE
         RETURN 'UPPER(Nombreusuario) = ''' || UPPER(VUSUARIO) || '''';
     END IF;
