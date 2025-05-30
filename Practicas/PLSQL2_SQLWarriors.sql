@@ -1,3 +1,16 @@
+CREATE OR REPLACE PROCEDURE P_ACTUALIZAR_TODAS_LAS_CUENTAS IS
+BEGIN
+  FOR c IN (SELECT ID FROM CUENTA) LOOP
+    BEGIN
+      PKG_ADMIN_PRODUCTOS.P_ACTUALIZAR_PRODUCTOS(c.ID);
+    EXCEPTION
+      WHEN OTHERS THEN
+        LOG_ERROR(SUBSTR('Error al actualizar cuenta ' || c.ID || ': ' || SQLCODE || ' - ' || SQLERRM, 1, 500));
+    END;
+  END LOOP;
+END;
+/
+
 CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS_AVANZADO AS
 
     EXCEPTION EXCEPTION_PLAN_NO_ASIGNADO;
@@ -441,15 +454,14 @@ END;
 
 BEGIN
     DBMS_SCHEDULER.CREATE_JOB (
-        job_name        => 'J_ACTUALIZA_PRODUCTOS',
-        job_type        => 'STORED_PROCEDURE',
-        job_action      => 'PKG_ADMIN_PRODUCTOS.P_ACTUALIZAR_PRODUCTOS',
-        number_of_arguments => 1,
-        start_date      => SYSTIMESTAMP,
-        repeat_interval => 'FREQ=WEEKLY;BYDAY=SUN;BYHOUR=2;BYMINUTE=0',
-        enabled         => FALSE,  -- Lo habilitamos luego de definir el parámetro
-        comments        => 'Actualiza la tabla de productos desde PRODUCTOS_EXT'
-    );
+    job_name        => 'J_ACTUALIZA_PRODUCTOS',
+    job_type        => 'STORED_PROCEDURE',
+    job_action      => 'P_ACTUALIZAR_TODAS_LAS_CUENTAS',
+    start_date      => SYSTIMESTAMP,
+    repeat_interval => 'FREQ=DAILY;BYHOUR=2;BYMINUTE=0',
+    enabled         => TRUE,
+    comments        => 'Actualiza los productos de todas las cuentas usando PRODUCTOS_EXT.'
+  );
 
     -- Definir el parámetro p_cuenta_id, por ejemplo, para la cuenta 1
     DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE(

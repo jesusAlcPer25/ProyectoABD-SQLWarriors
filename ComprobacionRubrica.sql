@@ -26,7 +26,7 @@ SELECT * FROM TRAZA;
 
 -- 2. Seguridad
 -- 2.1. Cifrado de columnas
-SELECT * FROM V$DBA_ENCRYPTED_COLUMNS;
+SELECT * FROM DBA_ENCRYPTED_COLUMNS;
 
 -- 2.2 Política VPD
 SELECT * FROM DBA_POLICIES WHERE OBJECT_OWNER = 'PLYTIX';   -- Muestra las políticas existentes
