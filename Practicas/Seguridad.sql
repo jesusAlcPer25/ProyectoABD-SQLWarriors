@@ -1,8 +1,47 @@
+-- Creación de roles
+CREATE USER ADMIN IDENTIFIED BY admin
+    DEFAULT TABLESPACE TS_PLYTIX
+    QUOTA UNLIMITED ON TS_PLYTIX
+    QUOTA UNLIMITED ON TS_INDICES
+    ACCOUNT LOCK
+;
+GRANT DBA TO ADMIN;
+
+--      Administrador sistema
+CREATE ROLE ROL_ADMIN IDENTIFIED BY admin;
+
+GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMIN;               -- Gestión TDE, solo un usuario
+GRANT ALTER SYSTEM TO ROL_ADMIN;
+GRANT EXECUTE ON DBMS_RLS TO ROL_ADMIN;                     -- Gestión VPD
+GRANT ALTER USER TO ROL_ADMIN;                              -- Gestión de usuarios
+GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_CREA_USUARIO TO ROL_ADMIN;           -- Crea usario
+GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_BORRAR_USUARIO TO ROL_ADMIN;         -- Eliminar usuario
+GRANT GRANT ANY ROLE TO ROL_ADMIN;
+
+GRANT ALL ON activo_categoria_act TO ROL_ADMIN;             -- Gestion de tablas
+GRANT ALL ON activo TO ROL_ADMIN;    
+GRANT ALL ON atributo TO ROL_ADMIN;    
+GRANT ALL ON atributo_producto TO ROL_ADMIN;    
+GRANT ALL ON categoria TO ROL_ADMIN;    
+GRANT ALL ON categoria_activo TO ROL_ADMIN;    
+GRANT ALL ON categoria_producto TO ROL_ADMIN;    
+GRANT ALL ON cuenta TO ROL_ADMIN;    
+GRANT ALL ON plan TO ROL_ADMIN;    
+GRANT ALL ON producto_activo TO ROL_ADMIN;    
+GRANT ALL ON producto TO ROL_ADMIN;
+GRANT ALL ON productos_ext TO ROL_ADMIN;
+GRANT ALL ON usuario TO ROL_ADMIN;    
+GRANT ALL ON relacionado TO ROL_ADMIN;
+GRANT ALL ON traza TO ROL_ADMIN;
+
+GRANT RESOURCE, CONNECT TO ROL_ADMIN;                       -- Gestión conexión y recursos
+GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMIN;
+
 -- Crear roles según los perfiles especificados
-CREATE ROLE administrador_sistema;
-CREATE ROLE usuario_estandar;
-CREATE ROLE gestor_cuentas;
-CREATE ROLE planificador_servicios;
+CREATE ROLE ROL_ADMINISTRADOR_SISTEMA;
+CREATE ROLE ROL_USUARIO_ESTANDAR;
+CREATE ROLE ROL_GESTOR_CUENTAS;
+CREATE ROLE ROL_PLANIFICADOR_SERVICIOS;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- ADMINISTRADOR DEL SISTEMA
@@ -173,44 +212,6 @@ ALTER TABLE USUARIO MODIFY (NIF ENCRYPT);
 
 
 -------- SEGURIDAD Y PERMISOS -------------------------------------------------------------------
--- Creación de roles
-CREATE USER ADMIN IDENTIFIED BY admin
-    DEFAULT TABLESPACE TS_PLYTIX
-    QUOTA UNLIMITED ON TS_PLYTIX
-    QUOTA UNLIMITED ON TS_INDICES
-    ACCOUNT LOCK
-;
-GRANT DBA TO ADMIN;
-
---      Administrador sistema
-CREATE ROLE ROL_ADMIN IDENTIFIED BY admin;
-
-GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMIN;               -- Gestión TDE, solo un usuario
-GRANT ALTER SYSTEM TO ROL_ADMIN;
-GRANT EXECUTE ON DBMS_RLS TO ROL_ADMIN;                     -- Gestión VPD
-GRANT ALTER USER TO ROL_ADMIN;                              -- Gestión de usuarios
-GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_CREA_USUARIO TO ROL_ADMIN;           -- Crea usario
-GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_BORRAR_USUARIO TO ROL_ADMIN;         -- Eliminar usuario
-GRANT GRANT ANY ROLE TO ROL_ADMIN;
-
-GRANT ALL ON activo_categoria_act TO ROL_ADMIN;             -- Gestion de tablas
-GRANT ALL ON activo TO ROL_ADMIN;    
-GRANT ALL ON atributo TO ROL_ADMIN;    
-GRANT ALL ON atributo_producto TO ROL_ADMIN;    
-GRANT ALL ON categoria TO ROL_ADMIN;    
-GRANT ALL ON categoria_activo TO ROL_ADMIN;    
-GRANT ALL ON categoria_producto TO ROL_ADMIN;    
-GRANT ALL ON cuenta TO ROL_ADMIN;    
-GRANT ALL ON plan TO ROL_ADMIN;    
-GRANT ALL ON producto_activo TO ROL_ADMIN;    
-GRANT ALL ON producto TO ROL_ADMIN;
-GRANT ALL ON productos_ext TO ROL_ADMIN;
-GRANT ALL ON usuario TO ROL_ADMIN;    
-GRANT ALL ON relacionado TO ROL_ADMIN;
-GRANT ALL ON traza TO ROL_ADMIN;
-
-GRANT RESOURCE, CONNECT TO ROL_ADMIN;                       -- Gestión conexión y recursos
-GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMIN;
 
 --      Usuario Estandar
 CREATE ROLE ROL_USUARIO;
