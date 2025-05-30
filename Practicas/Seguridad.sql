@@ -258,3 +258,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ROL_PLAN_SERVICIOS;
 GRANT SELECT, INSERT, UPDATE, DELETE ON activo TO ROL_PLAN_SERVICIOS;
 GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_PLAN_SERVICIOS;
 GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_activo TO ROL_PLAN_SERVICIOS;
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+-- Para configurar la auditoría
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+AUDIT INSERT, UPDATE, DELETE ON PLAN BY ACCESS;
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
