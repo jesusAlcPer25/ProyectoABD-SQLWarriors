@@ -1,27 +1,3 @@
-/* -- Tabla de traza (LOG) 
-CREATE TABLE TRAZA 
-    (
-        Fecha Date,
-        Usuario VARCHAR2(40),
-        Causante VARCHAR2(40), 
-        Descripcion VARCHAR2(500) 
-    )
-    TABLESPACE TS_PLYTIX
-;
-
--- Nombre del paquete: PKG_ADMIN_PRODUCTOS
-
--- 1. 
-CREATE OR REPLACE FUNCTION 
-    F_OBTENER_PLAN_CUENTA(P_CUENTA_ID IN CUENTA.ID%TYPE) 
-        RETURN PLAN%ROWTYPE -- Registro completo de la tabla PLAN
-AS
-    -- ZONA DECLARE
-BEGIN
-    NULL;
-    -- EXCEPTION ...
-END;
-/ */
 ---------------- Para crear el paquete ------------------------------
 CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
 
@@ -87,10 +63,10 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
         (
             P_CUENTA_ID IN CUENTA.ID%TYPE
         );
-
-    PROCEDURE LOG_ERROR
-        (  
-            p_mensaje IN VARCHAR2
+    
+    PROCEDURE P_BORRAR_USUARIO
+        (
+            p_usuario IN USUARIO%ROWTYPE
         );
 
 END;
@@ -119,10 +95,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN PLAN%ROWTYPE 
     AS
         V_PLAN              PLAN%ROWTYPE;
-        V_PLAN_ID           PLAN.ID%TYPE;
+        V_PLAN_ID           NUMBER;
     BEGIN
         BEGIN
-            SELECT PLAN INTO V_PLAN_ID
+            SELECT COUNT(*) INTO V_PLAN_ID
             FROM CUENTA
             WHERE ID = P_CUENTA_ID;
         EXCEPTION
@@ -131,7 +107,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                 RAISE;
         END;
 
-        IF V_PLAN_ID IS NULL THEN
+        IF V_PLAN_ID == 0 THEN
             LOG_ERROR('Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
             RAISE EXCEPTION_PLAN_NO_ASIGNADO;
         END IF;
@@ -159,12 +135,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN NUMBER 
     IS
         V_TOTAL     NUMBER;
-        V_CUENTA    CUENTA%ROWTYPE;
+        V_CUENTA    NUMBER;
     BEGIN
         
-        SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
+        SELECT COUNT(*) INTO V_CUENTA 
+        FROM CUENTA 
+        WHERE ID = P_CUENTA_ID;
         
-        IF V_CUENTA IS NULL THEN
+        IF V_CUENTA == 0 THEN
             LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
@@ -525,6 +503,28 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             RAISE;                                          -- Para propagar yo el error
 
     END P_CREAR_USUARIO;
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+-- Ejercicio 10: Extra 
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+    PROCEDURE P_BORRAR_USUARIO(
+        p_usuario         IN USUARIO%ROWTYPE
+    ) IS
+        v_sql               VARCHAR2(500);
+    BEGIN
+        -- Crear usuario 
+        v_sql := 'DROP USER '|| p_usuario|| ' CASCADE';
+        EXECUTE IMMEDIATE v_sql;
+
+    EXCEPTION
+        WHEN OTHERS THEN 
+            DBMS_OUTPUT.PUT_LINE('ERROR: ' || SUBSTR(SQLCODE||' '||SQLERRM, 1, 500));   -- Muestra el error por terminal
+            RAISE;                                          -- Para propagar yo el error
+
+    END P_BORRAR_USUARIO;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
