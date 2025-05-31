@@ -43,7 +43,7 @@ GRANT RESOURCE, CONNECT TO ROL_ADMINISTRADOR_SISTEMA;                           
 GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMINISTRADOR_SISTEMA;
 
 -- Seguridad: El Administrador tiene TDE y VPD (esto debe implementarse por DBA, ejemplo teórico):
-CREATE OR REPLACE FUNCTION verify_function (
+CREATE OR REPLACE FUNCTION F_VERIFY_PASSWORD (
    username      VARCHAR2,
    password      VARCHAR2,
    old_password  VARCHAR2
@@ -394,13 +394,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_activo TO ROL_PLANIFICADOR_SER
 -- Crear un perfil de política de contraseñas para usuarios estándar
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROFILE perfil_usuario_estandar LIMIT
+CREATE PROFILE PERF_USUARIO_ESTANDAR LIMIT
     FAILED_LOGIN_ATTEMPTS 3              -- máximo 3 intentos fallidos
     PASSWORD_LOCK_TIME 1/24              -- 1 hora bloqueado (1/24 días)
     PASSWORD_LIFE_TIME 30                -- la contraseña caduca a los 30 días
     PASSWORD_REUSE_TIME 90               -- no puede reutilizar contraseñas recientes por 90 días
     PASSWORD_REUSE_MAX 5                 -- no puede usar las últimas 5 contraseñas
-    PASSWORD_VERIFY_FUNCTION verify_function; -- función que comprueba la complejidad
+    PASSWORD_VERIFY_FUNCTION F_VERIFY_PASSWORD; -- función que comprueba la complejidad
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -411,7 +411,7 @@ CREATE PROFILE perfil_usuario_estandar LIMIT
 CREATE USER admin IDENTIFIED BY admin123;
 GRANT ROL_ADMINISTRADOR_SISTEMA TO admin;
 
-CREATE USER juan IDENTIFIED BY juan123 PROFILE perfil_usuario_estandar;
+CREATE USER juan IDENTIFIED BY juan123 PROFILE PERF_USUARIO_ESTANDAR;
 GRANT ROL_USUARIO_ESTANDAR TO juan;
 
 CREATE USER pedro IDENTIFIED BY pedro123;
