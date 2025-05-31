@@ -388,10 +388,25 @@ CREATE SEQUENCE SEQ_PRODUCTOS
     NOCACHE
     NOCYCLE
 ;
-create or replace trigger TR_PRODUCTOS  
-before insert on PRODUCTO for each row 
-begin 
-    if :new.GTIN is null then  
+
+CREATE OR REPLACE TRIGGER TR_PRODUCTOS  
+BEFORE INSERT ON PRODUCTO 
+FOR EACH ROW 
+BEGIN
+    -- Asignar GTIN si no viene
+    IF :new.GTIN IS NULL THEN  
         :new.GTIN := SEQ_PRODUCTOS.NEXTVAL; 
-    end if; 
-END TR_PRODUCTOS;
+    END IF;
+
+    -- Asignar CUENTA_ID automáticamente desde el contexto
+    :new.CUENTA_ID := SYS_CONTEXT('CTX_USUARIO', 'CUENTA_ID');
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_RELACIONADO
+BEFORE INSERT ON RELACIONADO
+FOR EACH ROW
+BEGIN
+  :NEW.CUENTA_ID := SYS_CONTEXT('CTX_USUARIO', 'CUENTA_ID');
+END;
+/

@@ -1,4 +1,12 @@
--- Creación de roles
+-- Crear roles según los perfiles especificados
+CREATE ROLE ROL_ADMINISTRADOR_SISTEMA IDENTIFIED BY admin;
+CREATE ROLE ROL_USUARIO_ESTANDAR;
+CREATE ROLE ROL_GESTOR_CUENTAS;
+CREATE ROLE ROL_PLANIFICADOR_SERVICIOS;
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- ADMINISTRADOR DEL SISTEMA
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 CREATE USER ADMIN IDENTIFIED BY admin
     DEFAULT TABLESPACE TS_PLYTIX
     QUOTA UNLIMITED ON TS_PLYTIX
@@ -7,51 +15,83 @@ CREATE USER ADMIN IDENTIFIED BY admin
 ;
 GRANT DBA TO ADMIN;
 
---      Administrador sistema
-CREATE ROLE ROL_ADMIN IDENTIFIED BY admin;
+GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMINISTRADOR_SISTEMA;                       -- Gestión TDE, solo un usuario
+GRANT ALTER SYSTEM TO ROL_ADMINISTRADOR_SISTEMA;
+GRANT EXECUTE ON DBMS_RLS TO ROL_ADMINISTRADOR_SISTEMA;                             -- Gestión VPD
+GRANT ALTER USER TO ROL_ADMINISTRADOR_SISTEMA;                                      -- Gestión de usuarios
+GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_CREA_USUARIO TO ROL_ADMINISTRADOR_SISTEMA;   -- Crea usario
+GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_BORRAR_USUARIO TO ROL_ADMINISTRADOR_SISTEMA; -- Eliminar usuario
+GRANT GRANT ANY ROLE TO ROL_ADMINISTRADOR_SISTEMA;
 
-GRANT ADMINISTER KEY MANAGEMENT TO ROL_ADMIN;               -- Gestión TDE, solo un usuario
-GRANT ALTER SYSTEM TO ROL_ADMIN;
-GRANT EXECUTE ON DBMS_RLS TO ROL_ADMIN;                     -- Gestión VPD
-GRANT ALTER USER TO ROL_ADMIN;                              -- Gestión de usuarios
-GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_CREA_USUARIO TO ROL_ADMIN;           -- Crea usario
-GRANT EXECUTE ON PKG_ADMIN_PRODUCTOS.P_BORRAR_USUARIO TO ROL_ADMIN;         -- Eliminar usuario
-GRANT GRANT ANY ROLE TO ROL_ADMIN;
+GRANT ALL ON activo_categoria_act TO ROL_ADMINISTRADOR_SISTEMA;                     -- Gestion de tablas
+GRANT ALL ON activo TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON atributo TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON atributo_producto TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON categoria TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON categoria_activo TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON categoria_producto TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON cuenta TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON plan TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON producto_activo TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON producto TO ROL_ADMINISTRADOR_SISTEMA;
+GRANT ALL ON productos_ext TO ROL_ADMINISTRADOR_SISTEMA;
+GRANT ALL ON usuario TO ROL_ADMINISTRADOR_SISTEMA;    
+GRANT ALL ON relacionado TO ROL_ADMINISTRADOR_SISTEMA;
+GRANT ALL ON traza TO ROL_ADMINISTRADOR_SISTEMA;
 
-GRANT ALL ON activo_categoria_act TO ROL_ADMIN;             -- Gestion de tablas
-GRANT ALL ON activo TO ROL_ADMIN;    
-GRANT ALL ON atributo TO ROL_ADMIN;    
-GRANT ALL ON atributo_producto TO ROL_ADMIN;    
-GRANT ALL ON categoria TO ROL_ADMIN;    
-GRANT ALL ON categoria_activo TO ROL_ADMIN;    
-GRANT ALL ON categoria_producto TO ROL_ADMIN;    
-GRANT ALL ON cuenta TO ROL_ADMIN;    
-GRANT ALL ON plan TO ROL_ADMIN;    
-GRANT ALL ON producto_activo TO ROL_ADMIN;    
-GRANT ALL ON producto TO ROL_ADMIN;
-GRANT ALL ON productos_ext TO ROL_ADMIN;
-GRANT ALL ON usuario TO ROL_ADMIN;    
-GRANT ALL ON relacionado TO ROL_ADMIN;
-GRANT ALL ON traza TO ROL_ADMIN;
-
-GRANT RESOURCE, CONNECT TO ROL_ADMIN;                       -- Gestión conexión y recursos
-GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMIN;
-
--- Crear roles según los perfiles especificados
-CREATE ROLE ROL_ADMINISTRADOR_SISTEMA;
-CREATE ROLE ROL_USUARIO_ESTANDAR;
-CREATE ROLE ROL_GESTOR_CUENTAS;
-CREATE ROLE ROL_PLANIFICADOR_SERVICIOS;
-
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- ADMINISTRADOR DEL SISTEMA
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
--- Control total sobre Plytix
-GRANT ALL PRIVILEGES ON ALL TABLES TO administrador_sistema;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES TO administrador_sistema;
+GRANT RESOURCE, CONNECT TO ROL_ADMINISTRADOR_SISTEMA;                               -- Gestión conexión y recursos
+GRANT CREATE TABLE, CREATE VIEW, CREATE PROCEDURE, CREATE SEQUENCE TO ROL_ADMINISTRADOR_SISTEMA;
 
 -- Seguridad: El Administrador tiene TDE y VPD (esto debe implementarse por DBA, ejemplo teórico):
+CREATE OR REPLACE FUNCTION verify_function (
+   username      VARCHAR2,
+   password      VARCHAR2,
+   old_password  VARCHAR2
+) RETURN BOOLEAN IS
+   v_min_length          CONSTANT INTEGER := 8;
+   v_common_passwords    SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST('password', '123456', '123456789', 'qwerty', 'abc123', 'admin');
+BEGIN
+    -- Validación de longitud mínima
+    IF LENGTH(password) < v_min_length THEN
+        RAISE_APPLICATION_ERROR(-20001, 'La contraseña debe tener al menos ' || v_min_length || ' caracteres.');
+    END IF;
+
+    -- No debe contener el nombre de usuario (insensible a mayúsculas/minúsculas)
+    IF INSTR(LOWER(password), LOWER(username)) > 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'La contraseña no debe contener el nombre de usuario.');
+    END IF;
+
+    -- Debe tener al menos una letra minúscula
+    IF NOT REGEXP_LIKE(password, '[a-z]') THEN
+        RAISE_APPLICATION_ERROR(-20003, 'La contraseña debe contener al menos una letra minúscula.');
+    END IF;
+
+    -- Debe tener al menos una letra mayúscula
+    IF NOT REGEXP_LIKE(password, '[A-Z]') THEN
+        RAISE_APPLICATION_ERROR(-20004, 'La contraseña debe contener al menos una letra mayúscula.');
+    END IF;
+
+    -- Debe tener al menos un número
+    IF NOT REGEXP_LIKE(password, '[0-9]') THEN
+        RAISE_APPLICATION_ERROR(-20005, 'La contraseña debe contener al menos un número.');
+    END IF;
+
+    -- Debe tener al menos un carácter especial
+    IF NOT REGEXP_LIKE(password, '[!@#$%^&*()_+=\-{}\[\]:;"''<>,.?/\\|]') THEN
+        RAISE_APPLICATION_ERROR(-20006, 'La contraseña debe contener al menos un carácter especial.');
+    END IF;
+
+    -- No debe estar en la lista de contraseñas comunes
+    FOR i IN 1 .. v_common_passwords.COUNT LOOP
+        IF LOWER(password) = LOWER(v_common_passwords(i)) THEN
+            RAISE_APPLICATION_ERROR(-20007, 'La contraseña es demasiado común. Elija una más segura.');
+        END IF;
+    END LOOP;
+
+    RETURN TRUE;
+END;
+/
+
 BEGIN
     DBMS_RLS.ADD_POLICY(
         object_schema => 'PLYTIX',
@@ -65,46 +105,253 @@ END;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--  CONTEXTO 
+
+CREATE CONTEXT CTX_USUARIO USING PKG_CONTEXT;
+
+CREATE OR REPLACE PACKAGE PKG_CONTEXT IS
+  PROCEDURE set_cuenta_id;
+END;
+/
+
+CREATE OR REPLACE PACKAGE BODY PKG_CONTEXT IS
+  
+  PROCEDURE set_cuenta_id IS
+        v_cuenta_id NUMBER;
+    BEGIN
+        SELECT cuenta_id INTO v_cuenta_id
+        FROM usuarios
+        WHERE usuario = SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+        DBMS_SESSION.set_context('CTX_USUARIO', 'CUENTA_ID', v_cuenta_id);
+    END;
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_SET_CONTEXT
+    AFTER LOGON ON DATABASE
+    BEGIN
+        PKG_CONTEXT.set_cuenta_id;
+    END;
+/
+
+SELECT SYS_CONTEXT('CTX_USUARIO', 'CUENTA_ID') FROM DUAL; -- Comprobación
+
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- USUARIO ESTÁNDAR
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+GRANT RESOURCE, CONNECT TO ROL_USUARIO;
+
 -- Permiso para ver/modificar su propia info (asumiendo columna usuario_id o similar)
-GRANT SELECT, UPDATE ON USUARIO TO usuario_estandar;
+GRANT SELECT, UPDATE ON USUARIO TO ROL_USUARIO_ESTANDAR;
+GRANT SELECT ON plan TO ROL_USUARIO;
 
 -- Permisos sobre PRODUCTO
-ALTER TABLE PRODUCTO ADD PUBLICO CHAR(1) DEFAULT 'S';
-GRANT SELECT, INSERT, UPDATE, DELETE ON PRODUCTO TO usuario_estandar;
+CREATE OR REPLACE FUNCTION F_USUARIO_PRODUCTO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'cuenta_id = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'PRODUCTO',
+    policy_name     => 'POL_SEGURIDAD_PRODUCTO',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_PRODUCTO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON PRODUCTO TO ROL_USUARIO_ESTANDAR;
 
 -- Vista de productos públicos
-CREATE OR REPLACE VIEW V_PRODUCTO_PUBLICO AS
-    SELECT * FROM PRODUCTO WHERE PUBLICO = 'S';
-GRANT SELECT ON V_PRODUCTO_PUBLICO TO usuario_estandar;
+GRANT SELECT, UPDATE (PUBLICO) ON V_PRODUCTO_PUBLICO TO ROL_USUARIO_ESTANDAR;
 
 -- Permisos sobre ACTIVO y relación Categorías
-GRANT SELECT, INSERT, UPDATE, DELETE ON ACTIVO TO usuario_estandar;
-GRANT SELECT, INSERT, UPDATE, DELETE ON CATEGORIA_ACTIVO TO usuario_estandar;
-
----------------------------------------- Modificar el trigger TR_PRODUCTOS para asignar cuenta_id automáticamente ----------------------------------------
-CREATE OR REPLACE TRIGGER TR_PRODUCTOS
-    BEFORE INSERT ON PRODUCTO
-    FOR EACH ROW
+CREATE OR REPLACE FUNCTION F_USUARIO_ACTIVO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
 BEGIN
-    SELECT cuenta_id INTO :NEW.cuenta_id
-    FROM USUARIO
-    WHERE usuario_id = SYS_CONTEXT('USERENV', 'SESSION_USER');
+    RETURN 'cuenta_id = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
 END;
+/
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'ACTIVO',
+    policy_name     => 'POL_SEGURIDAD_ACTIVO',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_ACTIVO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+CREATE OR REPLACE FUNCTION F_USUARIO_CAT_ACTIVO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'ACTIVO_CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'CATEGORIA_ACTIVO',
+    policy_name     => 'POL_SEGURIDAD_CAT_ACTIVO',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_CAT_ACTIVO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ACTIVO TO ROL_USUARIO_ESTANDAR;
+GRANT SELECT, INSERT, UPDATE, DELETE ON CATEGORIA_ACTIVO TO ROL_USUARIO_ESTANDAR;
 
 -- Permisos sobre CATEGORÍA Y relación con producto
-GRANT SELECT, INSERT, UPDATE, DELETE ON CATEGORIA TO usuario_estandar;
-GRANT SELECT, INSERT, UPDATE, DELETE ON PRODUCTO_CATEGORIA TO usuario_estandar;
+CREATE OR REPLACE FUNCTION F_USUARIO_CATEGORIA (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'CATEGORIA',
+    policy_name     => 'POL_SEGURIDAD_CATEGORIA',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_CATEGORIA',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+CREATE OR REPLACE FUNCTION F_USUARIO_CATEGORIA_PRODUCTO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'PRODUCTO_CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'') AND 
+            CATEGORIA_CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'CATEGORIA_PRODUCTO',
+    policy_name     => 'POL_SEGURIDAD_CAT_PROD',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_CATEGORIA_PRODUCTO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON CATEGORIA TO ROL_USUARIO_ESTANDAR;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_USUARIO_ESTANDAR;
 
 -- Permisos sobre RELACIONADO
-GRANT SELECT, INSERT, UPDATE, DELETE ON RELACIONADO TO usuario_estandar;
+CREATE OR REPLACE FUNCTION F_USUARIO_RELACIONADO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'RELACIONADO',
+    policy_name     => 'POL_SEGURIDAD_RELACIONADO',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_RELACIONADO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON RELACIONADO TO ROL_USUARIO_ESTANDAR;
 
 -- Permisos sobre ATRIBUTO y relación con productos
-GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO TO usuario_estandar;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO_PRODUCTO TO usuario_estandar;
+CREATE OR REPLACE FUNCTION F_USUARIO_ATRIBUTO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'ATRIBUTO',
+    policy_name     => 'POL_SEGURIDAD_ATRIBUTO',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_ATRIBUTO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+CREATE OR REPLACE FUNCTION F_USUARIO_ATRIBUTO_PRODUCTO (
+    schema_name IN VARCHAR2,
+    object_name IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    RETURN 'PRODUCTO_CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'') AND 
+            ATRIBUTO_CUENTA_ID = SYS_CONTEXT(''CTX_USUARIO'', ''CUENTA_ID'')';
+END;
+/
+
+BEGIN
+  DBMS_RLS.ADD_POLICY(
+    object_schema   => 'PLYTIX',
+    object_name     => 'ATRIBUTO_PRODUCTO',
+    policy_name     => 'POL_SEGURIDAD_ATRIBUTO_PRODUCTO',
+    function_schema => 'PLYTIX',
+    policy_function => 'F_USUARIO_ATRIBUTO_PRODUCTO',
+    statement_types => 'SELECT, INSERT, UPDATE, DELETE',
+    update_check    => TRUE
+  );
+END;
+/
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO TO ROL_USUARIO_ESTANDAR;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO_PRODUCTO TO ROL_USUARIO_ESTANDAR;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -112,13 +359,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO_PRODUCTO TO usuario_estandar;
 -- GESTOR DE CUENTAS
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+GRANT RESOURCE, CONNECT TO ROL_GESTOR_CUENTA;
+
 -- Permiso para gestionar cuentas
-GRANT SELECT, INSERT, UPDATE, DELETE ON CUENTA TO gestor_cuentas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON CUENTA TO ROL_GESTOR_CUENTAS;
 
 -- Solo puede acceder a datos no sensibles del usuario
 CREATE OR REPLACE VIEW V_USUARIO_PUBLICO AS
-    SELECT usuario_id, nombre, apellido FROM USUARIO;
-GRANT SELECT ON V_USUARIO_PUBLICO TO gestor_cuentas;
+    SELECT id, nombreusuario, nombrecompleto, avatar, cuenta_id 
+    FROM USUARIO;
+GRANT SELECT, UPDATE ON V_USUARIO_PUBLICO TO ROL_GESTOR_CUENTAS;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -126,13 +376,17 @@ GRANT SELECT ON V_USUARIO_PUBLICO TO gestor_cuentas;
 -- PLANIFICADOR DE SERVICIOS
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+GRANT RESOURCE, CONNECT TO ROL_PLAN_SERVICIOS;
+
 -- Permiso sobre tabla PLAN
-GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO planificador_servicios;
+GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO ROL_PLANIFICADOR_SERVICIOS;
 
 -- Permiso sobre relaciones (productos, activos, categorías)
-GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN_PRODUCTO TO planificador_servicios;
-GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN_ACTIVO TO planificador_servicios;
-GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN_CATEGORIA TO planificador_servicios;
+GRANT SELECT, INSERT, UPDATE, DELETE ON plan TO ROL_PLANIFICADOR_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ROL_PLANIFICADOR_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON activo TO ROL_PLANIFICADOR_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_PLANIFICADOR_SERVICIOS;
+GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_activo TO ROL_PLANIFICADOR_SERVICIOS;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -155,17 +409,16 @@ CREATE PROFILE perfil_usuario_estandar LIMIT
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 CREATE USER admin IDENTIFIED BY admin123;
-GRANT administrador_sistema TO admin;
+GRANT ROL_ADMINISTRADOR_SISTEMA TO admin;
 
-CREATE USER juan IDENTIFIED BY juan123;
-GRANT usuario_estandar TO juan;
-ALTER USER juan PROFILE perfil_usuario_estandar;
+CREATE USER juan IDENTIFIED BY juan123 PROFILE perfil_usuario_estandar;
+GRANT ROL_USUARIO_ESTANDAR TO juan;
 
-CREATE USER pedro INDENTIFIED BY pedro123;
-GRANT gestor_cuentas TO pedro
+CREATE USER pedro IDENTIFIED BY pedro123;
+GRANT ROL_GESTOR_CUENTAS TO pedro
 
 CREATE USER maria IDENTIFIED BY maria123;
-GRANT planificador_servicios TO maria;
+GRANT ROL_PLANIFICADOR_SERVICIOS TO maria;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -192,73 +445,6 @@ ALTER SESSION SET CURRENT_SCHEMA = gestor1;
 UPDATE CUENTA SET direccion_fiscal = 'Avda. Nueva, 123' WHERE cuenta_id = 1;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Para encryptar columnas
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
--- Hacerlo con las columnas que queramos y ya estaria hecho
-
-ALTER TABLE USUARIO MODIFY (EMAIL ENCRYPT);
-ALTER TABLE USUARIO MODIFY (TELEFONO ENCRYPT);
-ALTER TABLE USUARIO MODIFY (NIF ENCRYPT);
-
-
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
--------- SEGURIDAD Y PERMISOS -------------------------------------------------------------------
-
---      Usuario Estandar
-CREATE ROLE ROL_USUARIO;
-
-GRANT SELECT, UPDATE ON USUARIO TO ROL_USUARIO;
-GRANT SELECT ON plan TO ROL_USUARIO;
-GRANT RESOURCE, CONNECT TO ROL_USUARIO;                     -- Gestión conexión y recursos
-
---      Gestor cuentas
-CREATE ROLE ROL_GESTOR_CUENTA;
-GRANT RESOURCE, CONNECT TO ROL_GESTOR_CUENTA;               -- Gestión conexión y recursos
-
---      Planificador Servicios
-CREATE ROLE ROL_PLAN_SERVICIOS;
-GRANT RESOURCE, CONNECT TO ROL_PLAN_SERVICIOS;              -- Gestión conexión y recursos
-
-
--- Gestión de Permisos
--- RF1. Gestión rpoductos, Categoría y Activos
-GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ROL_USUARIO;
-GRANT SELECT, INSERT, UPDATE, DELETE ON activo TO ROL_USUARIO;
-GRANT SELECT, INSERT, UPDATE, DELETE ON activo_categoria_act TO ROL_USUARIO;
-GRANT SELECT, INSERT, UPDATE, DELETE ON categoria TO ROL_USUARIO;
-GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_USUARIO;
-    --  Un producto solo puede ser de una categoría de su misma cuenta
-GRANT SELECT, INSERT, UPDATE, DELETE ON relacionado TO ROL_USUARIO;
-    -- Solo se pueden relacionar productos de la misma cuenta que debe ser la misma que la del usuario que crea la relación.
-GRANT SELECT, INSERT, UPDATE, DELETE ON atributo TO ROL_USUARIO;
-GRANT SELECT, INSERT, UPDATE, DELETE ON atributo_producto TO ROL_USUARIO;
-    -- Ambos tienen que ser de la misma cuenta.
-
-
--- RF2. Gestión de cuentas
-GRANT SELECT, INSERT, UPDATE, DELETE ON CUENTA TO ROL_GESTOR_CUENTA;
-CREATE OR REPLACE VIEW V_USUARIO_PUBLICO AS
-    SELECT id, nombreusuario, nombrecompleto, avatar, cuenta_id
-    FROM USUARIO;                                           -- Preguntar si hacer por vistas o politicas
--- CREATE SYNONYM USUARIO FOR V_USUARIO_PUBLICO;
-GRANT SELECT, UPDATE ON V_USUARIO_PUBLICO TO ROL_GESTOR_CUENTA;
-
-
--- RF3. Gestión de los planes
-GRANT SELECT, INSERT, UPDATE, DELETE ON plan TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE, DELETE ON activo TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_producto TO ROL_PLAN_SERVICIOS;
-GRANT SELECT, INSERT, UPDATE, DELETE ON categoria_activo TO ROL_PLAN_SERVICIOS;
 
 -----------------------------------------------------------------------------------------------------------------------------------------------
 -- Para configurar la auditoría
