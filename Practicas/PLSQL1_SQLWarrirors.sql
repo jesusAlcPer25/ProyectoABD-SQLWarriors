@@ -1,10 +1,10 @@
 ---------------- Para crear el paquete ------------------------------
 CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
 
-    EXCEPTION EXCEPTION_PLAN_NO_ASIGNADO;
-    EXCEPTION INVALID_DATA;
-    EXCEPTION EXCEPTION_ASOCIACION_DUPLICADA;
-    EXCEPTION EXCEPTION_USUARIO_EXISTE;
+    EXCEPTION_PLAN_NO_ASIGNADO EXCEPTION;
+    INVALID_DATA EXCEPTION;
+    EXCEPTION_ASOCIACION_DUPLICADA EXCEPTION;
+    EXCEPTION_USUARIO_EXISTE EXCEPTION;
     
     FUNCTION F_OBTENER_PLAN_CUENTA
         (
@@ -42,8 +42,8 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS AS
         (
             P_PRODUCTO_GTIN IN PRODUCTO.GTIN%TYPE, 
             p_producto_cuenta_id IN PRODUCTO.CUENTA_ID%TYPE,
-            p_activo_id IN ACTIVOS.ID%TYPE,
-            p_activo_cuenta_id IN ACTIVOS.CUENTA_ID%TYPE
+            p_activo_id IN ACTIVO.ID%TYPE,
+            p_activo_cuenta_id IN ACTIVO.CUENTA_ID%TYPE
         );
     
     PROCEDURE P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES
@@ -107,7 +107,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                 RAISE;
         END;
 
-        IF V_PLAN_ID == 0 THEN
+        IF V_PLAN_ID = 0 THEN
             LOG_ERROR('Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
             RAISE EXCEPTION_PLAN_NO_ASIGNADO;
         END IF;
@@ -138,11 +138,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         V_CUENTA    NUMBER;
     BEGIN
         
-        SELECT COUNT(*) INTO V_CUENTA 
+        SELECT 1 INTO V_CUENTA 
         FROM CUENTA 
         WHERE ID = P_CUENTA_ID;
         
-        IF V_CUENTA == 0 THEN
+        IF V_CUENTA = 0 THEN
             LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
@@ -174,24 +174,24 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
     IS
         V_TOTAL_ATRIBUTOS       NUMBER;
         V_ATRIBUTOS_CON_VALOR   NUMBER;
-        V_AUX                   PRODUCTO.GTIN%TYPE;
+        V_AUX                   NUMBER;
     BEGIN
     
-        SELECT GTIN INTO V_AUX
+        SELECT 1 INTO V_AUX
             FROM PRODUCTO
             WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = P_CUENTA_ID;
 
-        IF V_AUX IS NULL THEN
+        IF V_AUX = 0 THEN
             LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
 
         SELECT COUNT(*) INTO V_TOTAL_ATRIBUTOS
-            FROM ATRIBUTOS;
+            FROM ATRIBUTO;
 
         SELECT COUNT(DISTINCT ATRIBUTO_ID) INTO V_ATRIBUTOS_CON_VALOR
             FROM ATRIBUTO_PRODUCTO
-            WHERE PRODUCTO_GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = P_CUENTA_ID;
+            WHERE PRODUCTO_GTIN = P_PRODUCTO_GTIN AND ATRIBUTO_CUENTA_ID = P_CUENTA_ID;
 
         RETURN V_TOTAL_ATRIBUTOS = V_ATRIBUTOS_CON_VALOR;
 
@@ -215,12 +215,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN NUMBER 
     IS
         V_TOTAL             NUMBER;
-        V_CUENTA            CUENTA%ROWTYPE;
+        V_CUENTA            NUMBER;
     BEGIN
         
-        SELECT * INTO V_CUENTA FROM CUENTA WHERE ID = P_CUENTA_ID;
+        SELECT 1 INTO V_CUENTA
+            FROM CUENTA 
+            WHERE ID = P_CUENTA_ID;
         
-        IF V_CUENTA IS NULL THEN
+        IF V_CUENTA = 0 THEN
             LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
@@ -250,20 +252,20 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         p_cuenta_id     IN PRODUCTO.CUENTA_ID%TYPE,
         p_nuevo_nombre  IN PRODUCTO.NOMBRE%TYPE
     ) IS
-        V_GTIN          PRODUCTO.GTIN%TYPE;
+        V_GTIN          NUMBER;
     BEGIN
 
-        SELECT GTIN INTO V_GTIN
+        SELECT 1 INTO V_GTIN
             FROM PRODUCTO
             WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = P_CUENTA_ID;
 
-        IF V_GTIN IS NULL THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Cuenta no encontrada con ID=' || P_CUENTA_ID);
+        IF V_GTIN = 0 THEN
+            LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
             RAISE NO_DATA_FOUND;
         END IF;
     
         IF p_nuevo_nombre IS NULL OR TRIM(p_nuevo_nombre) = '' THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Nombre introducido nulo = ' || p_nuevo_nombre);
+            LOG_ERROR('Nombre introducido nulo = ' || p_nuevo_nombre);
             RAISE INVALID_DATA;
         END IF;
 
@@ -288,27 +290,34 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
     PROCEDURE P_ASOCIAR_ACTIVO_A_PRODUCTO(
         p_producto_gtin        IN PRODUCTO.GTIN%TYPE,
         p_producto_cuenta_id   IN PRODUCTO.CUENTA_ID%TYPE,
-        p_activo_id            IN ACTIVOS.ID%TYPE,
-        p_activo_cuenta_id     IN ACTIVOS.CUENTA_ID%TYPE
+        p_activo_id            IN ACTIVO.ID%TYPE,
+        p_activo_cuenta_id     IN ACTIVO.CUENTA_ID%TYPE
     ) IS
         V_AUX           NUMBER;
-        V_GTIN          PRODUCTO.GTIN%TYPE;
-        V_ACTIVO_ID     ACTIVO.ID%TYPE;
     BEGIN
 
-        SELECT GTIN, CUENTA_ID INTO V_GTIN
+        BEGIN
+            SELECT 1 INTO V_AUX
             FROM PRODUCTO
-            WHERE GTIN = P_PRODUCTO_GTIN AND CUENTA_ID = p_producto_cuenta_id;
+            WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_producto_cuenta_id
+            AND ROWNUM = 1;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                LOG_ERROR('Producto no existente. GTIN = ' || p_producto_gtin);
+                RAISE NO_DATA_FOUND;
+        END;
 
-        SELECT ID INTO V_ACTIVO_ID
+        BEGIN
+            SELECT 1 INTO V_AUX
             FROM ACTIVO
-            WHERE P_ACTIVO_ID = P_ACTIVO_CUENTA_ID;
+            WHERE ID = p_activo_id AND CUENTA_ID = p_activo_cuenta_id
+            AND ROWNUM = 1;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                LOG_ERROR('Activo no existente. ID = ' || p_activo_id);
+                RAISE NO_DATA_FOUND;
+        END;
 
-        IF V_GTIN IS NULL OR V_ACTIVO_ID IS NULL THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Producto o activo no existente. GTIN = '||V_GTIN|| ' V_ACTIVO = '||V_ACTIVO ); 
-            RAISE NO_DATA_FOUND;
-        END IF;
-        
         BEGIN
             SELECT 1 INTO V_AUX 
                 FROM producto_activo
@@ -317,7 +326,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                         AND ACTIVO_ID = p_activo_id
                         AND ACTIVO_CUENTA_ID = p_activo_cuenta_id;
 
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Asociación ya existe entre producto y activo.');
+            LOG_ERROR('Asociación ya existe entre producto y activo.');
 
             RAISE EXCEPTION_ASOCIACION_DUPLICADA;
 
@@ -353,22 +362,25 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         p_producto_gtin     IN PRODUCTO.GTIN%TYPE,
         p_cuenta_id         IN PRODUCTO.CUENTA_ID%TYPE
     ) IS
-        V_AUX               PRODUCTO.GTIN%TYPE;
+        V_AUX               NUMBER;
     BEGIN
-        SELECT GTIN INTO V_AUX
-        FROM PRODUCTO
-        WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
 
-        IF V_AUX IS NULL THEN
-            INSERT INTO TRAZA VALUES (SYSDATE, USER, $$PLSQL_UNIT,'Producto no encontrado para eliminar. GTIN = '||V_AUX); 
-            RAISE NO_DATA_FOUND;
-        END IF;
+        BEGIN
+            SELECT 1 INTO V_AUX
+            FROM PRODUCTO
+            WHERE GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id
+            AND ROWNUM = 1;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                LOG_ERROR('Producto no encontrado para eliminar. GTIN = '||p_producto_gtin); 
+                RAISE NO_DATA_FOUND;
+        END;
 
         DELETE FROM producto_activo
         WHERE PRODUCTO_GTIN = p_producto_gtin AND PRODUCTO_CUENTA_ID = p_cuenta_id;
 
         DELETE FROM atributo_producto
-        WHERE PRODUCTO_GTIN = p_producto_gtin AND CUENTA_ID = p_cuenta_id;
+        WHERE PRODUCTO_GTIN = p_producto_gtin AND ATRIBUTO_CUENTA_ID = p_cuenta_id;
 
         DELETE FROM categoria_producto
         WHERE PRODUCTO_GTIN = p_producto_gtin AND PRODUCTO_CUENTA_ID = p_cuenta_id; 
@@ -427,7 +439,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
             EXCEPTION
                 WHEN NO_DATA_FOUND THEN
-                    INSERT INTO PRODUCTO ( GTIN, SKU, NOMBRE, TEXTOCORTO, CREADO, CUENTA_ID )
+                    INSERT INTO PRODUCTO ( SKU, NOMBRE, TEXTOCORTO, CREADO, CUENTA_ID )
                         VALUES (
                             prod_ex.SKU, prod_ex.NOMBRE, prod_ex.TEXTOCORTO, prod_ex.CREADO, p_cuenta_id
                         );
@@ -467,8 +479,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     PROCEDURE P_CREAR_USUARIO(
         p_usuario         IN USUARIO%ROWTYPE,
-        p_rol             IN VARCHAR2,
-        p_password        IN VARCHAR2
+        p_rol             IN VARCHAR,
+        p_password        IN VARCHAR
     ) IS
         v_sql               VARCHAR2(500);
         v_mensaje           VARCHAR2(500);
@@ -516,7 +528,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         v_sql               VARCHAR2(500);
     BEGIN
         -- Crear usuario 
-        v_sql := 'DROP USER '|| p_usuario|| ' CASCADE';
+        v_sql := 'DROP USER '|| p_usuario.nombreusuario || ' CASCADE';
         EXECUTE IMMEDIATE v_sql;
 
     EXCEPTION
