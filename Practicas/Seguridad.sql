@@ -92,16 +92,9 @@ BEGIN
 END;
 /
 
-BEGIN
-    DBMS_RLS.ADD_POLICY(
-        object_schema => 'PLYTIX',
-        object_name   => 'PRODUCTO',
-        policy_name   => 'VPD_PRODUCTO_POLICY',
-        function_schema => 'SECURITY',
-        policy_function => 'f_policy_producto',
-        statement_types => 'SELECT,INSERT,UPDATE,DELETE'
-    );
-END;
+CREATE OR REPLACE PUBLIC SYNONYM F_VERIFY_PASSWORD FOR PLYTIX.F_VERIFY_PASSWORD;
+GRANT EXECUTE ON PLYTIX.F_VERIFY_PASSWORD TO PUBLIC;
+
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -120,8 +113,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_CONTEXT IS
         v_cuenta_id NUMBER;
     BEGIN
         SELECT cuenta_id INTO v_cuenta_id
-        FROM usuarios
-        WHERE usuario = SYS_CONTEXT('USERENV', 'SESSION_USER');
+        FROM usuario
+        WHERE nombreusuario = SYS_CONTEXT('USERENV', 'SESSION_USER');
 
         DBMS_SESSION.set_context('CTX_USUARIO', 'CUENTA_ID', v_cuenta_id);
     END;
@@ -142,11 +135,11 @@ SELECT SYS_CONTEXT('CTX_USUARIO', 'CUENTA_ID') FROM DUAL; -- Comprobación
 -- USUARIO ESTÁNDAR
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-GRANT RESOURCE, CONNECT TO ROL_USUARIO;
+GRANT RESOURCE, CONNECT TO ROL_USUARIO_ESTANDAR;
 
 -- Permiso para ver/modificar su propia info (asumiendo columna usuario_id o similar)
 GRANT SELECT, UPDATE ON USUARIO TO ROL_USUARIO_ESTANDAR;
-GRANT SELECT ON plan TO ROL_USUARIO;
+GRANT SELECT ON plan TO ROL_USUARIO_ESTANDAR;
 
 -- Permisos sobre PRODUCTO
 CREATE OR REPLACE FUNCTION F_USUARIO_PRODUCTO (
@@ -359,7 +352,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ATRIBUTO_PRODUCTO TO ROL_USUARIO_ESTANDA
 -- GESTOR DE CUENTAS
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-GRANT RESOURCE, CONNECT TO ROL_GESTOR_CUENTA;
+GRANT RESOURCE, CONNECT TO ROL_GESTOR_CUENTAS;
 
 -- Permiso para gestionar cuentas
 GRANT SELECT, INSERT, UPDATE, DELETE ON CUENTA TO ROL_GESTOR_CUENTAS;
@@ -376,7 +369,7 @@ GRANT SELECT, UPDATE ON V_USUARIO_PUBLICO TO ROL_GESTOR_CUENTAS;
 -- PLANIFICADOR DE SERVICIOS
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-GRANT RESOURCE, CONNECT TO ROL_PLAN_SERVICIOS;
+GRANT RESOURCE, CONNECT TO ROL_PLANIFICADOR_SERVICIOS;
 
 -- Permiso sobre tabla PLAN
 GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO ROL_PLANIFICADOR_SERVICIOS;
@@ -451,5 +444,6 @@ UPDATE CUENTA SET direccion_fiscal = 'Avda. Nueva, 123' WHERE cuenta_id = 1;
 -----------------------------------------------------------------------------------------------------------------------------------------------
 
 AUDIT INSERT, UPDATE, DELETE ON PLAN BY ACCESS;
+AUDIT INSERT, UPDATE, DELETE ON CUETNA BY ACCESS;
 
 -----------------------------------------------------------------------------------------------------------------------------------------------

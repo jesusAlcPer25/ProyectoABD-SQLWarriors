@@ -1,16 +1,3 @@
-CREATE OR REPLACE PROCEDURE P_ACTUALIZAR_TODAS_LAS_CUENTAS IS
-BEGIN
-  FOR c IN (SELECT ID FROM CUENTA) LOOP
-    BEGIN
-      PKG_ADMIN_PRODUCTOS.P_ACTUALIZAR_PRODUCTOS(c.ID);
-    EXCEPTION
-      WHEN OTHERS THEN
-        LOG_ERROR(SUBSTR('Error al actualizar cuenta ' || c.ID || ': ' || SQLCODE || ' - ' || SQLERRM, 1, 500));
-    END;
-  END LOOP;
-END;
-/
-
 CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS_AVANZADO AS
 
     EXCEPTION EXCEPTION_PLAN_NO_ASIGNADO;
@@ -42,11 +29,13 @@ CREATE OR REPLACE PACKAGE PKG_ADMIN_PRODUCTOS_AVANZADO AS
             p_producto_gtin_destino IN PRODUCTO.GTIN%TYPE
         );
 
+    PROCEDURE P_ACTUALIZAR_TODAS_LAS_CUENTAS;
+
 END;
 /
 
 ------------------------------------------------------ Para modificar el cuerpo del paquete --------------------------------------------------------
-CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
+CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS_AVANZADO AS
 
     -- Si se crea una funcion aqui pero no se especifica arriba, la funcion es privada al paquete
 
@@ -66,7 +55,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
         RETURN VARCHAR2 
     AS
         V_PLAN                          PLAN%ROWTYPE;
-        V_CUENTA                        CUENTA.ID%TYPE;
+        V_CUENTA                        CUENTA.ID%ROWTYPE;
 
         V_NUM_PRODUCTOS                 NUMBER;
         V_NUM_ACTIVOS                   NUMBER;
@@ -82,22 +71,23 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
     BEGIN
     -- Comprobacion de que la cuenta existe y tiene un plan asociado
-        SELECT ID INTO V_CUENTA
+       SELECT ID INTO V_CUENTA
             FROM CUENTA
             WHERE ID = P_CUENTA_ID;
 
-        IF V_CUENTA IS NULL THEN
+        IF V_CUENTA = 0 THEN
             LOG_ERROR('Cuenta no encontrada con ID=' || P_CUENTA_ID);
-            RAISE NO_DATA_FOUND;
+                RAISE;
         END IF;
-
-        V_PLAN := F_OBTENER_PLAN_CUENTA(P_CUENTA_ID);
-
-        IF V_PLAN IS NULL THEN
-            LOG_ERROR('Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
-            RAISE EXCEPTION_PLAN_NO_ASIGNADO;
-        END IF;
-
+       
+        BEGIN
+            V_PLAN := F_OBTENER_PLAN_CUENTA(P_CUENTA_ID);   -- Si devuelve null, se trata en el apartado exception
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                LOG_ERROR('Plan no asignado a la cuenta con ID = '||P_CUENTA_ID);
+                RAISE;
+        END;
+  
     -- Carga de limites del plan asociado
         SELECT PRODUCTOS, ACTIVOS, CATEGORIASPRODUCTO, CATEGORIASACTIVOS, RELACIONES
         INTO V_LIM_PRODUCTOS, V_LIM_ACTIVOS, V_LIM_CATEGORIAS_PRODUCTO, V_LIM_CATEGORIAS_ACTIVOS, V_LIM_RELACIONES
@@ -145,7 +135,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
             DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));   -- Muestra el error por terminal
             RAISE;                                          -- Para propagar yo el error
-    END F_OBTENER_PLAN_CUENTA;
+    END F_VALIDAR_PLAN_SUFICIENTE;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -225,10 +215,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             AND C.CUENTA_ID = p_cuenta_id
             FOR UPDATE;
 
-       /*  V_CUENTA                CUENTA.ID%TYPE;
-        V_CAT_ORIGEN            CATEGORIA.ID%TYPE;
-        V_CAT_DESTINO           CATEGORIA.ID%TYPE; */
-
     BEGIN
     -- Validación: cuenta
         DECLARE
@@ -264,24 +250,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                 LOG_ERROR('Categoría de destino no encontrada o no pertenece a la cuenta. ID = ' || p_categoria_destino_id);
                 RAISE;
         END;
-/* 
-        SELECT ID INTO V_CUENTA
-            FROM CUENTA
-            WHERE ID = p_cuenta_id;
-        
-        SELECT ID INTO V_CAT_ORIGEN
-            FROM CATEGORIA
-            WHERE ID = P_CATEGORIA_ORIGEN_ID AND CUENTA_ID = p_cuenta_id;
 
-        SELECT ID INTO V_CAT_DESTINO
-            FROM CATEGORIA
-            WHERE ID = P_CATEGORIA_DESTINO_ID AND CUENTA_ID = p_cuenta_id;
-
-        IF (V_CUENTA IS NULL) OR (V_CAT_ORIGEN IS NULL) OR (V_CAT_DESTINO IS NULL) THEN
-            LOG_ERROR(SQLCODE || ' ' || SUBSTR(SQLERRM, 1, 500));
-            RAISE NO_DATA_FOUND;
-        END IF; 
-*/
     -- Obtención de productos y actualización de la categoría
         FOR producto IN CUR_PRODUCTOS LOOP
             UPDATE categoria_producto
@@ -290,11 +259,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
                 AND CATEGORIA_CUENTA_ID = p_cuenta_id
                 AND PRODUCTO_GTIN = producto.PRODUCTO_GTIN
                 AND PRODUCTO_CUENTA_ID = producto.PRODUCTO_CUENTA_ID;
-            /* DELETE FROM categoria_producto
-            WHERE PRODUCTO_GTIN = producto.PRODUCTO_GTIN AND CATEGORIA_ID = p_categoria_origen_id;
-
-            INSERT INTO PROD_CAT(PRODUCTO_GTIN, CATEGORIA_ID)VALUES (producto.PRODUCTO_GTIN, p_categoria_destino_id);
-             */
         END LOOP;
 
         COMMIT;
@@ -326,10 +290,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
             FOR UPDATE;
 
         v_valor_origen          ATRIBUTO_PRODUCTO.VALOR%TYPE;
-        /* V_PRODUCTO_ORIGEN       PRODUCTO.GTIN%TYPE;
-        V_PRODUCTO_DESTINO      PRODUCTO.GTIN%TYPE;
-        V_ATRIBUTO_AUX          ATRIBUTO_PRODUCTO.ID%TYPE;
-        v_atributo              ATRIBUTO_PRODUCTO%ROWTYPE; */
 
     BEGIN
     -- Verificar existencia de producto origen
@@ -381,30 +341,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
 
         COMMIT;
 
-        /* SELECT GTIN, CUENTA_ID INTO V_PRODUCTO_ORIGEN
-        FROM PRODUCTO
-        WHERE GTIN = p_producto_gtin_origen AND CUENTA_ID = p_cuenta_id;
-
-        SELECT GTIN, CUENTA_ID INTO V_PRODUCTO_DESTINO
-        FROM PRODUCTO
-        WHERE GTIN = p_producto_gtin_destino AND CUENTA_ID = p_cuenta_id;
-
-        IF (V_PRODUCTO_ORIGEN IS NULL) OR (V_PRODUCTO_ORIGEN) THEN
-            RAISE NO_DATA_FOUND;
-        END IF; */
-        /* FOR v_atributo IN CUR_ATRIBUTOS_ORIGEN LOOP
-            SELECT PRODUCTO_GTIN, CODIGO_ATRIBUTO INTO V_ATRIBUTO_AUX
-            FROM ATRIBUTO_PRODUCTO
-            WHERE PRODUCTO_GTIN = p_producto_gtin_destino AND CODIGO_ATRIBUTO = v_atributo.CODIGO_ATRIBUTO;
-
-            IF V_ATRIBUTO_AUX IS NULL THEN
-                INSERT INTO ATRIBUTO_PRODUCTO (PRODUCTO_GTIN, CODIGO_ATRIBUTO, VALOR) VALUES (p_producto_gtin_destino, v_atributo.CODIGO_ATRIBUTO, v_atributo.VALOR);
-            ELSE
-                UPDATE ATRIBUTO_PRODUCTO
-                    SET VALOR = v_atributo.VALOR
-                    WHERE PRODUCTO_GTIN = p_producto_gtin_destino AND CODIGO_ATRIBUTO = v_atributo.CODIGO_ATRIBUTO;
-            END IF;
-        END LOOP; */
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -414,6 +350,19 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADMIN_PRODUCTOS AS
     END P_REPLICAR_ATRIBUTOS;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+    PROCEDURE P_ACTUALIZAR_TODAS_LAS_CUENTAS
+    AS
+        BEGIN
+        FOR c IN (SELECT ID FROM CUENTA) LOOP
+            BEGIN
+            PKG_ADMIN_PRODUCTOS.P_ACTUALIZAR_PRODUCTOS(c.ID);
+            EXCEPTION
+            WHEN OTHERS THEN
+                LOG_ERROR(SUBSTR('Error al actualizar cuenta ' || c.ID || ': ' || SQLCODE || ' - ' || SQLERRM, 1, 500));
+            END;
+        END LOOP;
+    END P_ACTUALIZAR_TODAS_LAS_CUENTAS;
 
 END;
 /
@@ -456,19 +405,12 @@ BEGIN
     DBMS_SCHEDULER.CREATE_JOB (
     job_name        => 'J_ACTUALIZA_PRODUCTOS',
     job_type        => 'STORED_PROCEDURE',
-    job_action      => 'P_ACTUALIZAR_TODAS_LAS_CUENTAS',
+    job_action      => 'PKG_ADMIN_PRODUCTOS_AVANZADO.P_ACTUALIZAR_TODAS_LAS_CUENTAS',
     start_date      => SYSTIMESTAMP,
     repeat_interval => 'FREQ=DAILY;BYHOUR=2;BYMINUTE=0',
     enabled         => TRUE,
     comments        => 'Actualiza los productos de todas las cuentas usando PRODUCTOS_EXT.'
   );
-
-    -- Definir el parámetro p_cuenta_id, por ejemplo, para la cuenta 1
-    DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE(
-        job_name  => 'J_ACTUALIZA_PRODUCTOS',
-        argument_position => 1,
-        argument_value    => '1'
-    );
 
     -- Habilitar el job
     DBMS_SCHEDULER.ENABLE('J_ACTUALIZA_PRODUCTOS');
