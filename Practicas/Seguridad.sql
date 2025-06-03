@@ -444,6 +444,6 @@ UPDATE CUENTA SET direccion_fiscal = 'Avda. Nueva, 123' WHERE cuenta_id = 1;
 -----------------------------------------------------------------------------------------------------------------------------------------------
 
 AUDIT INSERT, UPDATE, DELETE ON PLAN BY ACCESS;
-AUDIT INSERT, UPDATE, DELETE ON CUETNA BY ACCESS;
+AUDIT INSERT, UPDATE, DELETE ON CUENTA BY ACCESS;
 
 -----------------------------------------------------------------------------------------------------------------------------------------------

@@ -197,6 +197,7 @@ ORA-06512: en línea 4
            executed.
 *Action:   Rewrite PL/SQL function, making sure that it always returns
            a value of a proper type.
+*/
 
 -- 6.4. F_NUM_CATEGORIAS_CUENTA
 DECLARE
@@ -206,7 +207,7 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE('Número de categorías: ' || v_categorias);
 END;
 /
-*/
+
 ----------------------------------------
 
 -- 7. Triggers
@@ -513,7 +514,7 @@ END;
 /
 
 -- Comprobación --
-SELECT COUNT(*) FROM trazas;
+SELECT COUNT(*) FROM traza;
 
 --------------------
 
@@ -616,6 +617,10 @@ SHOW PARAMETER audit_trail;
 SELECT * 
 FROM dba_stmt_audit_opts 
 WHERE user_name = 'PLYTIX' OR user_name IS NULL;
+
+SELECT *
+FROM dba_obj_audit_opts
+WHERE object_name IN ('PLAN', 'CUENTA');
 
 -- Comprobacion --
 -- Con la consulta anterior deberian de oberservarse los atributos que son auditados
@@ -729,7 +734,7 @@ END;
 CREATE CONTEXT PLYTIX_CONTEXT USING PLYTIX.PKG_CONTEXT; 
     -- Util para poder probar un usuario como admin, usaremos para suplantar identidad de un usuario
 -- ALTER SESSION SET CONTEXT ...;
-SYS_CONTEXT('userenv','SESSION_USER');
+SELECT SYS_CONTEXT('userenv','SESSION_USER') FROM DUAL;
     -- Añadir contextos para pruebas pero poner control
 
 -- ¿Para qué sirve PLYTIX_CONTEXT?
