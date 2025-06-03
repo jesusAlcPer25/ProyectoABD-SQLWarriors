@@ -102,7 +102,7 @@ SELECT * FROM VM_PRODUCTOS;
 -- 4.4. Gestión de las cuentas
 -- 4.5. Gestión de los planes
 
-SELECT ROLE FROM DBA_ROLES WHERE ORACLE_MAINTAINED = 'N'   -- Muestra los roles creados por el usuario
+SELECT ROLE FROM DBA_ROLES WHERE ORACLE_MAINTAINED = 'N';   -- Muestra los roles creados por el usuario
 
 -- ¿Cómo se aseguran de que cada usuario solo pueda hacer lo que debe?
 -- Respuesta: Se crean roles con permisos específicos y se asignan según el perfil del usuario.
@@ -212,7 +212,7 @@ END;
 -- 7. Triggers
 SELECT * FROM user_triggers;                         -- Muestras los triggers existentes
 
-SELECT trigger_body FROM user_triggers               -- Muestra el código del trigger
+SELECT trigger_body FROM user_triggers;               -- Muestra el código del trigger
 
 -- ¿Qué triggers hay y qué hacen?
 -- Respuesta: Consulta user_triggers para identificarlos. Ej.: podrían actualizar la tabla TRAZA con auditoría.
@@ -700,7 +700,7 @@ WHERE user_name = 'PLYTIX' OR user_name IS NULL;
     EXCEPTION
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Error al verificar: ' || SQLERRM);
-    END;
+    END;
 END;
 /
 
